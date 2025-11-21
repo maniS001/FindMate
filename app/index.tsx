@@ -1,0 +1,106 @@
+import { useRouter } from 'expo-router';
+import { MapPin, Search } from 'lucide-react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+export default function LandingScreen() {
+    const router = useRouter();
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <View style={styles.header}>
+                <Text style={styles.title}>FindMate</Text>
+                <Text style={styles.subtitle}>Reconnecting people with their belongings.</Text>
+            </View>
+
+            <View style={styles.content}>
+                <TouchableOpacity
+                    style={[styles.card, styles.lostCard]}
+                    onPress={() => router.push('/victim/search')}
+                    activeOpacity={0.9}
+                >
+                    <View style={styles.iconContainer}>
+                        <Search size={32} color="#FFF" />
+                    </View>
+                    <Text style={styles.cardTitle}>I Lost Something</Text>
+                    <Text style={styles.cardDesc}>Search for your lost items and claim them securely.</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.card, styles.foundCard]}
+                    onPress={() => router.push('/founder/report')}
+                    activeOpacity={0.9}
+                >
+                    <View style={styles.iconContainer}>
+                        <MapPin size={32} color="#FFF" />
+                    </View>
+                    <Text style={styles.cardTitle}>I Found Something</Text>
+                    <Text style={styles.cardDesc}>Report an item you found to help return it.</Text>
+                </TouchableOpacity>
+            </View>
+        </SafeAreaView>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+        padding: 24,
+    },
+    header: {
+        marginTop: 40,
+        marginBottom: 60,
+    },
+    title: {
+        fontSize: 42,
+        fontWeight: '800',
+        color: '#1E293B',
+        letterSpacing: -1,
+    },
+    subtitle: {
+        fontSize: 18,
+        color: '#64748B',
+        marginTop: 8,
+    },
+    content: {
+        gap: 24,
+    },
+    card: {
+        padding: 32,
+        borderRadius: 24,
+        height: 220,
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 5,
+    },
+    lostCard: {
+        backgroundColor: '#3B82F6', // Blue
+    },
+    foundCard: {
+        backgroundColor: '#10B981', // Emerald
+    },
+    iconContainer: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    cardTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#FFF',
+        marginBottom: 8,
+    },
+    cardDesc: {
+        fontSize: 16,
+        color: 'rgba(255,255,255,0.9)',
+        lineHeight: 24,
+    },
+});
