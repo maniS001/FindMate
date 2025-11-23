@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CustomImagePicker from '../../components/ImagePicker';
@@ -24,23 +24,36 @@ export default function ReportFoundItem() {
 
     const handleSubmit = async () => {
         if (!form.name || !form.location || !form.secretQuestion || !form.secretAnswer || !form.contactInfo) {
-            Alert.alert('Error', 'Please fill in all required fields');
+            Alert.alert('Missing Information', 'Please fill in all required fields');
             return;
         }
 
         setLoading(true);
-
-        // Simulate API call
-        setTimeout(() => {
-            addItem({
-                id: Math.random().toString(36).substr(2, 9),
-                ...form,
+        try {
+            await addItem({
+                name: form.name,
+                category: form.category,
+                location: form.location,
+                date: form.date,
+                description: form.description,
+                contactInfo: form.contactInfo,
+                imageUri: form.imageUri,
+                questions: [
+                    {
+                        question: form.secretQuestion,
+                        answer: form.secretAnswer,
+                    }
+                ],
             });
+            router.push({
+                pathname: '/success',
+                params: { type: 'report' }
+            });
+        } catch (error) {
+            Alert.alert('Error', 'Failed to report item. Please try again.');
+        } finally {
             setLoading(false);
-            Alert.alert('Success', 'Item reported successfully!', [
-                { text: 'OK', onPress: () => router.back() }
-            ]);
-        }, 1000);
+        }
     };
 
     return (
@@ -49,10 +62,24 @@ export default function ReportFoundItem() {
                 <Text style={styles.header}>Report Found Item</Text>
                 <Text style={styles.subHeader}>Help the owner find their lost belonging.</Text>
 
+                <TouchableOpacity
+                    style={styles.complaintsLink}
+                    onPress={() => router.push('/founder/complaints')}
+                    activeOpacity={0.7}
+                >
+                    <Text style={styles.complaintsLinkText}>
+                        💡 Check Pending Complaints First
+                    </Text>
+                    <Text style={styles.complaintsLinkDesc}>
+                        See if someone already filed a complaint about this item
+                    </Text>
+                </TouchableOpacity>
+
                 <View style={styles.form}>
                     <CustomImagePicker
                         label="Item Photo"
-                        onImageSelected={(uri) => setForm({ ...form, imageUri: uri })}
+                        onImagesSelected={(uris) => setForm({ ...form, imageUri: uris[0] || '' })}
+                        initialImages={form.imageUri ? [form.imageUri] : []}
                     />
 
                     <Input
@@ -150,7 +177,25 @@ const styles = StyleSheet.create({
     subHeader: {
         fontSize: 16,
         color: '#64748B',
-        marginBottom: 32,
+        marginBottom: 12,
+    },
+    complaintsLink: {
+        backgroundColor: '#FEF3C7',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    complaintsLinkText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#92400E',
+        marginBottom: 4,
+    },
+    complaintsLinkDesc: {
+        fontSize: 14,
+        color: '#B45309',
     },
     form: {
         gap: 8,

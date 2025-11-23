@@ -1,21 +1,52 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Calendar, MapPin } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../../components/Button';
 import CustomImagePicker from '../../../components/ImagePicker';
 import Input from '../../../components/Input';
-import { getItemById } from '../../../store';
+import { getItemById, Item } from '../../../store';
+
+import Captcha from '../../../components/Captcha';
+import OtpModal from '../../../components/OtpModal';
+import PaymentModal from '../../../components/PaymentModal';
+import { CONFIG } from '../../../constants/config';
 
 export default function ClaimItem() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
-    const item = getItemById(id);
+    const [item, setItem] = useState<Item | null>(null);
+    const [loading, setLoading] = useState(true);
 
-    const [answer, setAnswer] = useState('');
-    const [proofImage, setProofImage] = useState<string | null>(null);
+    useEffect(() => {
+        const fetchItem = async () => {
+            if (id) {
+                const fetchedItem = await getItemById(id);
+                setItem(fetchedItem);
+            }
+            setLoading(false);
+        };
+        fetchItem();
+    }, [id]);
+
+    const [answers, setAnswers] = useState<{ [key: number]: string }>({});
+    const [proofImages, setProofImages] = useState<string[]>([]);
     const [isVerified, setIsVerified] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [isPaid, setIsPaid] = useState(false);
+
+    const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+    const [isOtpVerified, setIsOtpVerified] = useState(false);
+    const [showOtpModal, setShowOtpModal] = useState(false);
+
+    if (loading) {
+        return (
+            <View style={styles.center}>
+                <Text>Loading...</Text>
+            </View>
+        );
+    }
 
     if (!item) {
         return (
@@ -25,17 +56,69 @@ export default function ClaimItem() {
         );
     }
 
-    const handleVerify = () => {
-        if (answer.toLowerCase().trim() === item.secretAnswer.toLowerCase().trim()) {
-            setIsVerified(true);
-            Alert.alert('Success', 'Identity Verified! You can now contact the founder.');
-        } else {
-            Alert.alert('Incorrect Answer', 'That is not the correct answer. Please try again.');
+    const handleCaptchaVerify = (isValid: boolean) => {
+        setIsCaptchaVerified(isValid);
+        if (isValid && !isOtpVerified) {
+            setTimeout(() => setShowOtpModal(true), 500);
         }
+    };
+
+    const handleOtpVerified = () => {
+        setIsOtpVerified(true);
+        setShowOtpModal(false);
+    };
+
+    const handleVerify = () => {
+        const allCorrect = item.questions.every((q, index) => {
+            const userAnswer = answers[index] || '';
+            return userAnswer.toLowerCase().trim() === q.answer.toLowerCase().trim();
+        });
+
+        if (allCorrect) {
+            setIsVerified(true);
+            if (CONFIG.ENABLE_PAYMENT) {
+                setShowPaymentModal(true);
+            } else {
+                setIsPaid(true);
+                router.push({
+                    pathname: '/success',
+                    params: {
+                        type: 'verification',
+                        contactInfo: item.contactInfo
+                    }
+                });
+            }
+        } else {
+            Alert.alert('❌ Incorrect Answer', 'One or more answers are incorrect. Please try again.');
+        }
+    };
+
+    const handlePaymentSuccess = () => {
+        setShowPaymentModal(false);
+        setIsPaid(true);
+        router.push({
+            pathname: '/success',
+            params: {
+                type: 'payment',
+                contactInfo: item.contactInfo
+            }
+        });
     };
 
     return (
         <SafeAreaView style={styles.container} edges={['bottom']}>
+            <PaymentModal
+                visible={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                onSuccess={handlePaymentSuccess}
+            />
+
+            <OtpModal
+                visible={showOtpModal}
+                onClose={() => setShowOtpModal(false)}
+                onVerified={handleOtpVerified}
+            />
+
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.card}>
                     <Text style={styles.itemName}>{item.name}</Text>
@@ -54,30 +137,44 @@ export default function ClaimItem() {
                     <Text style={styles.description}>{item.description}</Text>
                 </View>
 
-                {!isVerified ? (
+                {!isOtpVerified ? (
                     <View style={styles.verificationSection}>
                         <View style={styles.warningBox}>
                             <AlertCircle size={24} color="#B45309" />
                             <Text style={styles.warningText}>
-                                To prevent fraud, you must answer the security question set by the founder to reveal their contact info.
+                                Complete the security check to proceed with claiming this item.
+                            </Text>
+                        </View>
+                        <Captcha onVerify={handleCaptchaVerify} />
+                    </View>
+                ) : !isPaid ? (
+                    <View style={styles.verificationSection}>
+                        <View style={styles.warningBox}>
+                            <AlertCircle size={24} color="#B45309" />
+                            <Text style={styles.warningText}>
+                                To prevent fraud, you must answer the security questions set by the founder to reveal their contact info.
                             </Text>
                         </View>
 
                         <CustomImagePicker
                             label="Upload Proof (Optional)"
-                            onImageSelected={setProofImage}
+                            onImagesSelected={setProofImages}
+                            initialImages={proofImages}
                         />
 
-                        <Text style={styles.questionLabel}>Security Question:</Text>
-                        <Text style={styles.question}>{item.secretQuestion}</Text>
+                        {item.questions.map((q, index) => (
+                            <View key={index} style={{ marginTop: 16 }}>
+                                <Text style={styles.questionLabel}>Question {index + 1}:</Text>
+                                <Text style={styles.question}>{q.question}</Text>
 
-                        <Input
-                            label="Your Answer"
-                            placeholder="Type your answer here..."
-                            value={answer}
-                            onChangeText={setAnswer}
-                            style={{ marginTop: 16 }}
-                        />
+                                <Input
+                                    label="Your Answer"
+                                    placeholder="Type your answer here..."
+                                    value={answers[index] || ''}
+                                    onChangeText={(text) => setAnswers({ ...answers, [index]: text })}
+                                />
+                            </View>
+                        ))}
 
                         <Button
                             title="Verify & Claim"

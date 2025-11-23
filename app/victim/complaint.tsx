@@ -1,49 +1,66 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
+import { addComplaint } from '../../store';
 
-export default function SearchLostItem() {
+export default function FileComplaint() {
     const router = useRouter();
+    const [loading, setLoading] = useState(false);
+
     const [form, setForm] = useState({
         name: '',
         category: '',
         location: '',
-        date: '',
+        date: new Date().toISOString().split('T')[0],
         description: '',
         contactInfo: '',
         imageUris: [] as string[],
     });
 
-    const handleSearch = () => {
-        router.push({
-            pathname: '/victim/results',
-            params: {
+    const handleSubmit = async () => {
+        if (!form.name || !form.category || !form.location || !form.contactInfo) {
+            Alert.alert('Missing Information', 'Please fill in all required fields.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await addComplaint({
                 ...form,
                 imageUris: JSON.stringify(form.imageUris),
-            }
-        });
+            });
+            Alert.alert('Success', 'Your complaint has been filed successfully! You will be notified if a match is found.', [
+                { text: 'OK', onPress: () => router.back() }
+            ]);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to file complaint. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <SafeAreaView style={styles.container} edges={['bottom']}>
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.header}>Find Lost Item</Text>
-                <Text style={styles.subHeader}>Search for items that have been reported found.</Text>
+                <Text style={styles.header}>File a Complaint</Text>
+                <Text style={styles.subHeader}>
+                    Didn't find your item? File a complaint and we'll notify you if someone reports finding it.
+                </Text>
 
                 <View style={styles.form}>
                     <Input
-                        label="What did you lose? *"
-                        placeholder="e.g. Keys, Wallet, Phone"
+                        label="Item Name *"
+                        placeholder="e.g. iPhone 13 Pro"
                         value={form.name}
                         onChangeText={(text) => setForm({ ...form, name: text })}
                     />
 
                     <Input
-                        label="Category"
+                        label="Category *"
                         placeholder="e.g. Electronics, Keys, Wallet"
                         value={form.category}
                         onChangeText={(text) => setForm({ ...form, category: text })}
@@ -51,7 +68,7 @@ export default function SearchLostItem() {
 
                     <Input
                         label="Where did you lose it? *"
-                        placeholder="e.g. Central Park"
+                        placeholder="e.g. Central Park, Times Square"
                         value={form.location}
                         onChangeText={(text) => setForm({ ...form, location: text })}
                     />
@@ -65,15 +82,15 @@ export default function SearchLostItem() {
 
                     <Input
                         label="Description"
-                        placeholder="Additional details..."
+                        placeholder="Additional details about the item..."
                         value={form.description}
                         onChangeText={(text) => setForm({ ...form, description: text })}
                         multiline
-                        numberOfLines={3}
+                        numberOfLines={4}
                     />
 
                     <Input
-                        label="Your Contact Info *"
+                        label="Your Contact Information *"
                         placeholder="Phone or Email"
                         value={form.contactInfo}
                         onChangeText={(text) => setForm({ ...form, contactInfo: text })}
@@ -86,8 +103,9 @@ export default function SearchLostItem() {
                     />
 
                     <Button
-                        title="Search Items"
-                        onPress={handleSearch}
+                        title="Submit Complaint"
+                        onPress={handleSubmit}
+                        loading={loading}
                         style={{ marginTop: 24 }}
                     />
                 </View>
@@ -114,6 +132,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#64748B',
         marginBottom: 32,
+        lineHeight: 24,
     },
     form: {
         gap: 8,

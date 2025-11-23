@@ -1,29 +1,32 @@
 import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
-export const pickImageFromGallery = async (): Promise<string | null> => {
+export const pickImageFromGallery = async (allowsMultipleSelection: boolean = false): Promise<string[]> => {
     try {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to make this work!');
-            return null;
+        if (Platform.OS !== 'web') {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to make this work!');
+                return [];
+            }
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
-            allowsEditing: true,
+            allowsEditing: Platform.OS === 'web' ? false : !allowsMultipleSelection, // Cropping is not supported when multiple selection is enabled, and not supported well on web
             aspect: [4, 3],
             quality: 1,
+            allowsMultipleSelection,
         });
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
-            return result.assets[0].uri;
+            return result.assets.map(asset => asset.uri);
         }
     } catch (error) {
         console.error('Error picking image:', error);
         Alert.alert('Error', 'An error occurred while picking the image.');
     }
-    return null;
+    return [];
 };
 
 export const takePhotoWithCamera = async (): Promise<string | null> => {

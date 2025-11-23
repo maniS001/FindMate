@@ -1,29 +1,48 @@
-import { Camera, Image as ImageIcon } from 'lucide-react-native';
+import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { pickImageFromGallery, takePhotoWithCamera } from '../services/ImagePickerService';
 
 interface ImagePickerProps {
     label: string;
-    onImageSelected: (uri: string) => void;
-    initialImage?: string;
+    onImagesSelected: (uris: string[]) => void;
+    initialImages?: string[];
 }
 
-export default function CustomImagePicker({ label, onImageSelected, initialImage }: ImagePickerProps) {
-    const [image, setImage] = useState<string | null>(initialImage || null);
+export default function CustomImagePicker({ label, onImagesSelected, initialImages = [] }: ImagePickerProps) {
+    const [images, setImages] = useState<string[]>(initialImages);
 
-    const handleImageSelection = async (method: 'camera' | 'gallery') => {
-        const uri = method === 'camera'
-            ? await takePhotoWithCamera()
-            : await pickImageFromGallery();
-
-        if (uri) {
-            setImage(uri);
-            onImageSelected(uri);
+    const handleImageSelection = async (method: 'camera' | 'gallery', multiple: boolean = false) => {
+        if (method === 'camera') {
+            const uri = await takePhotoWithCamera();
+            if (uri) {
+                const newImages = [...images, uri];
+                setImages(newImages);
+                onImagesSelected(newImages);
+            }
+        } else {
+            const uris = await pickImageFromGallery(multiple);
+            if (uris.length > 0) {
+                const newImages = [...images, ...uris];
+                setImages(newImages);
+                onImagesSelected(newImages);
+            }
         }
     };
 
+    const removeImage = (index: number) => {
+        const newImages = images.filter((_, i) => i !== index);
+        setImages(newImages);
+        onImagesSelected(newImages);
+    };
+
     const pickImage = () => {
+        // On web, skip the alert and go directly to gallery
+        if (Platform.OS === 'web') {
+            handleImageSelection('gallery', true);
+            return;
+        }
+
         Alert.alert(
             'Select Image',
             'Choose an image source',
@@ -33,8 +52,12 @@ export default function CustomImagePicker({ label, onImageSelected, initialImage
                     onPress: () => handleImageSelection('camera'),
                 },
                 {
-                    text: 'Gallery',
-                    onPress: () => handleImageSelection('gallery'),
+                    text: 'Select One (Crop)',
+                    onPress: () => handleImageSelection('gallery', false),
+                },
+                {
+                    text: 'Select Multiple',
+                    onPress: () => handleImageSelection('gallery', true),
                 },
                 {
                     text: 'Cancel',
@@ -47,21 +70,26 @@ export default function CustomImagePicker({ label, onImageSelected, initialImage
     return (
         <View style={styles.container}>
             <Text style={styles.label}>{label}</Text>
-            <TouchableOpacity onPress={pickImage} style={styles.picker} activeOpacity={0.8}>
-                {image ? (
-                    <Image source={{ uri: image }} style={styles.image} />
-                ) : (
-                    <View style={styles.placeholder}>
-                        <ImageIcon size={32} color="#94A3B8" />
-                        <Text style={styles.placeholderText}>Tap to upload photo</Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+                {images.map((uri, index) => (
+                    <View key={index} style={styles.imageContainer}>
+                        <Image source={{ uri }} style={styles.image} />
+                        <TouchableOpacity
+                            style={styles.removeButton}
+                            onPress={() => removeImage(index)}
+                            activeOpacity={0.8}
+                        >
+                            <X size={16} color="#FFF" />
+                        </TouchableOpacity>
                     </View>
-                )}
-                {image && (
-                    <View style={styles.editOverlay}>
-                        <Camera size={20} color="#FFF" />
-                    </View>
-                )}
-            </TouchableOpacity>
+                ))}
+
+                <TouchableOpacity onPress={pickImage} style={styles.addButton} activeOpacity={0.8}>
+                    <ImageIcon size={32} color="#94A3B8" />
+                    <Text style={styles.addButtonText}>{images.length > 0 ? 'Add More' : 'Upload Photos'}</Text>
+                </TouchableOpacity>
+            </ScrollView>
         </View>
     );
 }
@@ -77,38 +105,44 @@ const styles = StyleSheet.create({
         color: '#475569',
         marginBottom: 8,
     },
-    picker: {
-        width: '100%',
-        height: 200,
-        backgroundColor: '#F1F5F9',
-        borderRadius: 16,
+    scrollContent: {
+        gap: 12,
+    },
+    imageContainer: {
+        width: 120,
+        height: 120,
+        borderRadius: 12,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        borderStyle: 'dashed',
+        position: 'relative',
     },
     image: {
         width: '100%',
         height: '100%',
         resizeMode: 'cover',
     },
-    placeholder: {
-        flex: 1,
+    removeButton: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        padding: 4,
+        borderRadius: 12,
+    },
+    addButton: {
+        width: 120,
+        height: 120,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderStyle: 'dashed',
         gap: 8,
     },
-    placeholderText: {
+    addButtonText: {
         color: '#94A3B8',
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '500',
-    },
-    editOverlay: {
-        position: 'absolute',
-        bottom: 12,
-        right: 12,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        padding: 8,
-        borderRadius: 20,
     },
 });
