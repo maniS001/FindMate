@@ -1,11 +1,15 @@
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import express from 'express';
 import { findMatchingComplaints } from './matching';
 
+// Load environment variables
+dotenv.config();
+
 const app = express();
 const prisma = new PrismaClient();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
