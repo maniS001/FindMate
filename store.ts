@@ -2,7 +2,7 @@
 // API Configuration
 // For real Android device, use your computer's IP address (both must be on same WiFi)
 // Computer IP: 10.56.226.180
-const API_URL = 'https://findmate-backend.onrender.com/api';
+const API_URL = 'https://findmate-backend-her6.onrender.com/api';
 
 // = Platform.OS === 'android'
 //     ? 'http://10.56.226.180:3000/api'  // For Android device on same WiFi
