@@ -1,43 +1,59 @@
 import { useRouter } from 'expo-router';
 import { MapPin, Search } from 'lucide-react-native';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../contexts/ThemeContext';
+import { wakeUpServer } from '../utils/serverWakeUp';
 
 export default function LandingScreen() {
     const router = useRouter();
+    const { colors } = useTheme();
+
+    // Wake up the backend server when app loads
+    useEffect(() => {
+        wakeUpServer();
+    }, []);
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>FindMate</Text>
-                <Text style={styles.subtitle}>Reconnecting people with their belongings.</Text>
-            </View>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.header}>
+                    <Text style={[styles.title, { color: colors.text }]}>FindMate</Text>
+                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                        Reconnecting people with their belongings.
+                    </Text>
+                </View>
 
-            <View style={styles.content}>
-                <TouchableOpacity
-                    style={[styles.card, styles.lostCard]}
-                    onPress={() => router.push('/victim/search')}
-                    activeOpacity={0.9}
-                >
-                    <View style={styles.iconContainer}>
-                        <Search size={32} color="#FFF" />
-                    </View>
-                    <Text style={styles.cardTitle}>I Lost Something</Text>
-                    <Text style={styles.cardDesc}>Search for your lost items and claim them securely.</Text>
-                </TouchableOpacity>
+                <View style={styles.content}>
+                    <TouchableOpacity
+                        style={[styles.card, styles.lostCard]}
+                        onPress={() => router.push('/victim/search')}
+                        activeOpacity={0.9}
+                    >
+                        <View style={styles.iconContainer}>
+                            <Search size={32} color="#FFF" />
+                        </View>
+                        <Text style={styles.cardTitle}>I Lost Something</Text>
+                        <Text style={styles.cardDesc}>Search for your lost items and claim them securely.</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                    style={[styles.card, styles.foundCard]}
-                    onPress={() => router.push('/founder/report')}
-                    activeOpacity={0.9}
-                >
-                    <View style={styles.iconContainer}>
-                        <MapPin size={32} color="#FFF" />
-                    </View>
-                    <Text style={styles.cardTitle}>I Found Something</Text>
-                    <Text style={styles.cardDesc}>Report an item you found to help return it.</Text>
-                </TouchableOpacity>
-            </View>
+                    <TouchableOpacity
+                        style={[styles.card, styles.foundCard]}
+                        onPress={() => router.push('/founder/report')}
+                        activeOpacity={0.9}
+                    >
+                        <View style={styles.iconContainer}>
+                            <MapPin size={32} color="#FFF" />
+                        </View>
+                        <Text style={styles.cardTitle}>I Found Something</Text>
+                        <Text style={styles.cardDesc}>Report an item you found to help return it.</Text>
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
@@ -45,8 +61,10 @@ export default function LandingScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+    },
+    scrollContent: {
         padding: 24,
+        flexGrow: 1,
     },
     header: {
         marginTop: 40,
@@ -55,12 +73,10 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 42,
         fontWeight: '800',
-        color: '#1E293B',
         letterSpacing: -1,
     },
     subtitle: {
         fontSize: 18,
-        color: '#64748B',
         marginTop: 8,
     },
     content: {

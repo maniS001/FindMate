@@ -1,14 +1,16 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
+import { useTheme } from '../../contexts/ThemeContext';
 import { addComplaint } from '../../store';
 
 export default function FileComplaint() {
     const router = useRouter();
+    const { colors } = useTheme();
     const [loading, setLoading] = useState(false);
 
     const [form, setForm] = useState({
@@ -44,72 +46,81 @@ export default function FileComplaint() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['bottom']}>
-            <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.header}>File a Complaint</Text>
-                <Text style={styles.subHeader}>
-                    Didn't find your item? File a complaint and we'll notify you if someone reports finding it.
-                </Text>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={0}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <Text style={[styles.heading, { color: colors.text }]}>File a Complaint</Text>
+                    <Text style={[styles.subHeader, { color: colors.textSecondary }]}>
+                        Didn't find your item? File a complaint and we'll notify you if someone reports finding it.
+                    </Text>
 
-                <View style={styles.form}>
-                    <Input
-                        label="Item Name *"
-                        placeholder="e.g. iPhone 13 Pro"
-                        value={form.name}
-                        onChangeText={(text) => setForm({ ...form, name: text })}
-                    />
+                    <View style={styles.form}>
+                        <Input
+                            label="Item Name *"
+                            placeholder="e.g. iPhone 13 Pro"
+                            value={form.name}
+                            onChangeText={(text) => setForm({ ...form, name: text })}
+                        />
 
-                    <Input
-                        label="Category *"
-                        placeholder="e.g. Electronics, Keys, Wallet"
-                        value={form.category}
-                        onChangeText={(text) => setForm({ ...form, category: text })}
-                    />
+                        <Input
+                            label="Category *"
+                            placeholder="e.g. Electronics, Keys, Wallet"
+                            value={form.category}
+                            onChangeText={(text) => setForm({ ...form, category: text })}
+                        />
 
-                    <Input
-                        label="Where did you lose it? *"
-                        placeholder="e.g. Central Park, Times Square"
-                        value={form.location}
-                        onChangeText={(text) => setForm({ ...form, location: text })}
-                    />
+                        <Input
+                            label="Where did you lose it? *"
+                            placeholder="e.g. Central Park, Times Square"
+                            value={form.location}
+                            onChangeText={(text) => setForm({ ...form, location: text })}
+                        />
 
-                    <Input
-                        label="When did you lose it?"
-                        placeholder="YYYY-MM-DD"
-                        value={form.date}
-                        onChangeText={(text) => setForm({ ...form, date: text })}
-                    />
+                        <Input
+                            label="When did you lose it?"
+                            placeholder="YYYY-MM-DD"
+                            value={form.date}
+                            onChangeText={(text) => setForm({ ...form, date: text })}
+                        />
 
-                    <Input
-                        label="Description"
-                        placeholder="Additional details about the item..."
-                        value={form.description}
-                        onChangeText={(text) => setForm({ ...form, description: text })}
-                        multiline
-                        numberOfLines={4}
-                    />
+                        <Input
+                            label="Description"
+                            placeholder="Additional details about the item..."
+                            value={form.description}
+                            onChangeText={(text) => setForm({ ...form, description: text })}
+                            multiline
+                            numberOfLines={4}
+                        />
 
-                    <Input
-                        label="Your Contact Information *"
-                        placeholder="Phone or Email"
-                        value={form.contactInfo}
-                        onChangeText={(text) => setForm({ ...form, contactInfo: text })}
-                    />
+                        <Input
+                            label="Your Contact Information *"
+                            placeholder="Phone or Email"
+                            value={form.contactInfo}
+                            onChangeText={(text) => setForm({ ...form, contactInfo: text })}
+                        />
 
-                    <CustomImagePicker
-                        label="Upload Photos (Optional)"
-                        onImagesSelected={(uris) => setForm({ ...form, imageUris: uris })}
-                        initialImages={form.imageUris}
-                    />
+                        <CustomImagePicker
+                            label="Upload Photos (Optional)"
+                            onImagesSelected={(uris) => setForm({ ...form, imageUris: uris })}
+                            initialImages={form.imageUris}
+                        />
 
-                    <Button
-                        title="Submit Complaint"
-                        onPress={handleSubmit}
-                        loading={loading}
-                        style={{ marginTop: 24 }}
-                    />
-                </View>
-            </ScrollView>
+                        <Button
+                            title="Submit Complaint"
+                            onPress={handleSubmit}
+                            loading={loading}
+                            style={{ marginTop: 24 }}
+                        />
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
@@ -117,20 +128,17 @@ export default function FileComplaint() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
     },
     content: {
         padding: 24,
     },
-    header: {
+    heading: {
         fontSize: 28,
         fontWeight: '700',
-        color: '#1E293B',
         marginBottom: 8,
     },
     subHeader: {
         fontSize: 16,
-        color: '#64748B',
         marginBottom: 32,
         lineHeight: 24,
     },

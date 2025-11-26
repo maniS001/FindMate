@@ -1,20 +1,21 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Calendar, MapPin } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../../components/Button';
+import Captcha from '../../../components/Captcha';
 import CustomImagePicker from '../../../components/ImagePicker';
 import Input from '../../../components/Input';
-import { getItemById, Item } from '../../../store';
-
-import Captcha from '../../../components/Captcha';
 import OtpModal from '../../../components/OtpModal';
 import PaymentModal from '../../../components/PaymentModal';
 import { CONFIG } from '../../../constants/config';
+import { useTheme } from '../../../contexts/ThemeContext';
+import { getItemById, Item } from '../../../store';
 
 export default function ClaimItem() {
     const { id } = useLocalSearchParams<{ id: string }>();
+    const { colors } = useTheme();
     const router = useRouter();
     const [item, setItem] = useState<Item | null>(null);
     const [loading, setLoading] = useState(true);
@@ -42,16 +43,16 @@ export default function ClaimItem() {
 
     if (loading) {
         return (
-            <View style={styles.center}>
-                <Text>Loading...</Text>
+            <View style={[styles.center, { backgroundColor: colors.background }]}>
+                <Text style={{ color: colors.text }}>Loading...</Text>
             </View>
         );
     }
 
     if (!item) {
         return (
-            <View style={styles.center}>
-                <Text>Item not found</Text>
+            <View style={[styles.center, { backgroundColor: colors.background }]}>
+                <Text style={{ color: colors.text }}>Item not found</Text>
             </View>
         );
     }
@@ -106,7 +107,7 @@ export default function ClaimItem() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['bottom']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
             <PaymentModal
                 visible={showPaymentModal}
                 onClose={() => setShowPaymentModal(false)}
@@ -119,88 +120,98 @@ export default function ClaimItem() {
                 onVerified={handleOtpVerified}
             />
 
-            <ScrollView contentContainerStyle={styles.content}>
-                <View style={styles.card}>
-                    <Text style={styles.itemName}>{item.name}</Text>
+            <KeyboardAvoidingView
+                behavior="padding"
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={!isOtpVerified ? 100 : 0}
+                enabled
+            >
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
 
-                    <View style={styles.metaRow}>
-                        <View style={styles.row}>
-                            <MapPin size={16} color="#64748B" />
-                            <Text style={styles.metaText}>{item.location}</Text>
-                        </View>
-                        <View style={styles.row}>
-                            <Calendar size={16} color="#64748B" />
-                            <Text style={styles.metaText}>{item.date}</Text>
-                        </View>
-                    </View>
-
-                    <Text style={styles.description}>{item.description}</Text>
-                </View>
-
-                {!isOtpVerified ? (
-                    <View style={styles.verificationSection}>
-                        <View style={styles.warningBox}>
-                            <AlertCircle size={24} color="#B45309" />
-                            <Text style={styles.warningText}>
-                                Complete the security check to proceed with claiming this item.
-                            </Text>
-                        </View>
-                        <Captcha onVerify={handleCaptchaVerify} />
-                    </View>
-                ) : !isPaid ? (
-                    <View style={styles.verificationSection}>
-                        <View style={styles.warningBox}>
-                            <AlertCircle size={24} color="#B45309" />
-                            <Text style={styles.warningText}>
-                                To prevent fraud, you must answer the security questions set by the founder to reveal their contact info.
-                            </Text>
-                        </View>
-
-                        <CustomImagePicker
-                            label="Upload Proof (Optional)"
-                            onImagesSelected={setProofImages}
-                            initialImages={proofImages}
-                        />
-
-                        {item.questions.map((q, index) => (
-                            <View key={index} style={{ marginTop: 16 }}>
-                                <Text style={styles.questionLabel}>Question {index + 1}:</Text>
-                                <Text style={styles.question}>{q.question}</Text>
-
-                                <Input
-                                    label="Your Answer"
-                                    placeholder="Type your answer here..."
-                                    value={answers[index] || ''}
-                                    onChangeText={(text) => setAnswers({ ...answers, [index]: text })}
-                                />
+                        <View style={styles.metaRow}>
+                            <View style={styles.row}>
+                                <MapPin size={16} color={colors.textSecondary} />
+                                <Text style={[styles.metaText, { color: colors.textSecondary }]}>{item.location}</Text>
                             </View>
-                        ))}
-
-                        <Button
-                            title="Verify & Claim"
-                            onPress={handleVerify}
-                            style={{ marginTop: 24 }}
-                        />
-                    </View>
-                ) : (
-                    <View style={styles.successSection}>
-                        <View style={styles.successBox}>
-                            <Text style={styles.successTitle}>Contact Information</Text>
-                            <Text style={styles.contactInfo}>{item.contactInfo}</Text>
-                            <Text style={styles.successDesc}>
-                                Please contact the founder to arrange a meetup.
-                            </Text>
+                            <View style={styles.row}>
+                                <Calendar size={16} color={colors.textSecondary} />
+                                <Text style={[styles.metaText, { color: colors.textSecondary }]}>{item.date}</Text>
+                            </View>
                         </View>
 
-                        <Button
-                            title="Back to Home"
-                            variant="secondary"
-                            onPress={() => router.dismissAll()}
-                            style={{ marginTop: 24 }}
-                        />
+                        <Text style={[styles.description, { color: colors.textSecondary }]}>{item.description}</Text>
                     </View>
-                )}
-            </ScrollView>
+
+                    {!isOtpVerified ? (
+                        <View style={styles.verificationSection}>
+                            <View style={styles.warningBox}>
+                                <AlertCircle size={24} color="#B45309" />
+                                <Text style={styles.warningText}>
+                                    Complete the security check to proceed with claiming this item.
+                                </Text>
+                            </View>
+                            <Captcha onVerify={handleCaptchaVerify} />
+                        </View>
+                    ) : !isPaid ? (
+                        <View style={styles.verificationSection}>
+                            <View style={styles.warningBox}>
+                                <AlertCircle size={24} color="#B45309" />
+                                <Text style={styles.warningText}>
+                                    To prevent fraud, you must answer the security questions set by the founder to reveal their contact info.
+                                </Text>
+                            </View>
+
+                            <CustomImagePicker
+                                label="Upload Proof (Optional)"
+                                onImagesSelected={setProofImages}
+                                initialImages={proofImages}
+                            />
+
+                            {item.questions.map((q, index) => (
+                                <View key={index} style={{ marginTop: 16 }}>
+                                    <Text style={[styles.questionLabel, { color: colors.textSecondary }]}>Question {index + 1}:</Text>
+                                    <Text style={[styles.question, { color: colors.text }]}>{q.question}</Text>
+
+                                    <Input
+                                        label="Your Answer"
+                                        placeholder="Type your answer here..."
+                                        value={answers[index] || ''}
+                                        onChangeText={(text) => setAnswers({ ...answers, [index]: text })}
+                                    />
+                                </View>
+                            ))}
+
+                            <Button
+                                title="Verify & Claim"
+                                onPress={handleVerify}
+                                style={{ marginTop: 24 }}
+                            />
+                        </View>
+                    ) : (
+                        <View style={styles.successSection}>
+                            <View style={styles.successBox}>
+                                <Text style={styles.successTitle}>Contact Information</Text>
+                                <Text style={styles.contactInfo}>{item.contactInfo}</Text>
+                                <Text style={styles.successDesc}>
+                                    Please contact the founder to arrange a meetup.
+                                </Text>
+                            </View>
+
+                            <Button
+                                title="Back to Home"
+                                variant="secondary"
+                                onPress={() => router.dismissAll()}
+                                style={{ marginTop: 24 }}
+                            />
+                        </View>
+                    )}
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
@@ -208,7 +219,6 @@ export default function ClaimItem() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
     },
     center: {
         flex: 1,
@@ -217,9 +227,9 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: 24,
+        paddingBottom: 40,
     },
     card: {
-        backgroundColor: '#FFFFFF',
         padding: 24,
         borderRadius: 24,
         marginBottom: 32,
@@ -228,11 +238,11 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 12,
         elevation: 2,
+        borderWidth: 1,
     },
     itemName: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#1E293B',
         marginBottom: 16,
     },
     metaRow: {
@@ -246,12 +256,10 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     metaText: {
-        color: '#64748B',
         fontSize: 14,
     },
     description: {
         fontSize: 16,
-        color: '#475569',
         lineHeight: 24,
     },
     verificationSection: {
@@ -276,14 +284,12 @@ const styles = StyleSheet.create({
     questionLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#64748B',
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
     question: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1E293B',
         marginBottom: 8,
     },
     successSection: {

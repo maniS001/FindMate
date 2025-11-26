@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Alert, Modal, StyleSheet, Text, View } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 import Button from './Button';
 import Input from './Input';
 
@@ -10,6 +11,7 @@ interface OtpModalProps {
 }
 
 export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps) {
+    const { colors } = useTheme();
     const [step, setStep] = useState<'phone' | 'otp'>('phone');
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState('');
@@ -46,11 +48,11 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
     return (
         <Modal visible={visible} animationType="slide" transparent>
             <View style={styles.overlay}>
-                <View style={styles.modal}>
-                    <Text style={styles.title}>
+                <View style={[styles.modal, { backgroundColor: colors.surface }]}>
+                    <Text style={[styles.title, { color: colors.text }]}>
                         {step === 'phone' ? 'Phone Verification' : 'Enter OTP'}
                     </Text>
-                    <Text style={styles.subtitle}>
+                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                         {step === 'phone'
                             ? 'We need to verify your phone number before you can report an item.'
                             : `Enter the code sent to ${phone}`}
@@ -102,7 +104,6 @@ const styles = StyleSheet.create({
         padding: 24,
     },
     modal: {
-        backgroundColor: '#FFF',
         borderRadius: 24,
         padding: 24,
         gap: 16,
@@ -110,12 +111,10 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1E293B',
         textAlign: 'center',
     },
     subtitle: {
         fontSize: 14,
-        color: '#64748B',
         textAlign: 'center',
         marginBottom: 8,
     },

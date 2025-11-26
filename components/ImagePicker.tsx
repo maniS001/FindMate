@@ -1,6 +1,7 @@
-import { Image as ImageIcon, X } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, X } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 import { pickImageFromGallery, takePhotoWithCamera } from '../services/ImagePickerService';
 
 interface ImagePickerProps {
@@ -10,9 +11,12 @@ interface ImagePickerProps {
 }
 
 export default function CustomImagePicker({ label, onImagesSelected, initialImages = [] }: ImagePickerProps) {
+    const { colors } = useTheme();
     const [images, setImages] = useState<string[]>(initialImages);
+    const [modalVisible, setModalVisible] = useState(false);
 
     const handleImageSelection = async (method: 'camera' | 'gallery', multiple: boolean = false) => {
+        setModalVisible(false);
         if (method === 'camera') {
             const uri = await takePhotoWithCamera();
             if (uri) {
@@ -37,39 +41,17 @@ export default function CustomImagePicker({ label, onImagesSelected, initialImag
     };
 
     const pickImage = () => {
-        // On web, skip the alert and go directly to gallery
+        // On web, skip the modal and go directly to gallery
         if (Platform.OS === 'web') {
             handleImageSelection('gallery', true);
             return;
         }
-
-        Alert.alert(
-            'Select Image',
-            'Choose an image source',
-            [
-                {
-                    text: 'Camera',
-                    onPress: () => handleImageSelection('camera'),
-                },
-                {
-                    text: 'Select One (Crop)',
-                    onPress: () => handleImageSelection('gallery', false),
-                },
-                {
-                    text: 'Select Multiple',
-                    onPress: () => handleImageSelection('gallery', true),
-                },
-                {
-                    text: 'Cancel',
-                    style: 'cancel',
-                },
-            ]
-        );
+        setModalVisible(true);
     };
 
     return (
         <View style={styles.container}>
-            <Text style={styles.label}>{label}</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 {images.map((uri, index) => (
@@ -85,11 +67,65 @@ export default function CustomImagePicker({ label, onImagesSelected, initialImag
                     </View>
                 ))}
 
-                <TouchableOpacity onPress={pickImage} style={styles.addButton} activeOpacity={0.8}>
-                    <ImageIcon size={32} color="#94A3B8" />
-                    <Text style={styles.addButtonText}>{images.length > 0 ? 'Add More' : 'Upload Photos'}</Text>
+                <TouchableOpacity
+                    onPress={pickImage}
+                    style={[styles.addButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    activeOpacity={0.8}
+                >
+                    <ImageIcon size={32} color={colors.textSecondary} />
+                    <Text style={[styles.addButtonText, { color: colors.textSecondary }]}>
+                        {images.length > 0 ? 'Add More' : 'Upload Photos'}
+                    </Text>
                 </TouchableOpacity>
             </ScrollView>
+
+            <Modal
+                visible={modalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setModalVisible(false)}
+                >
+                    <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>Select Image Source</Text>
+
+                        <TouchableOpacity
+                            style={[styles.modalOption, { borderBottomColor: colors.border }]}
+                            onPress={() => handleImageSelection('camera')}
+                        >
+                            <Camera size={24} color={colors.text} />
+                            <Text style={[styles.modalOptionText, { color: colors.text }]}>Take Photo</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.modalOption, { borderBottomColor: colors.border }]}
+                            onPress={() => handleImageSelection('gallery', false)}
+                        >
+                            <ImageIcon size={24} color={colors.text} />
+                            <Text style={[styles.modalOptionText, { color: colors.text }]}>Select One (Crop)</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.modalOption, { borderBottomColor: colors.border }]}
+                            onPress={() => handleImageSelection('gallery', true)}
+                        >
+                            <ImageIcon size={24} color={colors.text} />
+                            <Text style={[styles.modalOptionText, { color: colors.text }]}>Select Multiple</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.modalCancel, { backgroundColor: colors.background }]}
+                            onPress={() => setModalVisible(false)}
+                        >
+                            <Text style={[styles.modalCancelText, { color: colors.error || '#EF4444' }]}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </View>
     );
 }
@@ -102,7 +138,6 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#475569',
         marginBottom: 8,
     },
     scrollContent: {
@@ -131,18 +166,53 @@ const styles = StyleSheet.create({
     addButton: {
         width: 120,
         height: 120,
-        backgroundColor: '#F1F5F9',
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E2E8F0',
         borderStyle: 'dashed',
         gap: 8,
     },
     addButtonText: {
-        color: '#94A3B8',
         fontSize: 12,
         fontWeight: '500',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 24,
+        paddingBottom: 40,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 24,
+        textAlign: 'center',
+    },
+    modalOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        gap: 16,
+    },
+    modalOptionText: {
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    modalCancel: {
+        marginTop: 24,
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    modalCancelText: {
+        fontSize: 16,
+        fontWeight: '700',
     },
 });

@@ -3,9 +3,11 @@ import { CheckCircle } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function Success() {
     const router = useRouter();
+    const { colors } = useTheme();
     const params = useLocalSearchParams<{
         type: string;
         message: string;
@@ -45,19 +47,19 @@ export default function Success() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['bottom']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
             <View style={styles.content}>
                 <View style={styles.iconContainer}>
-                    <CheckCircle size={80} color="#10B981" strokeWidth={2} />
+                    <CheckCircle size={80} color={colors.success} strokeWidth={2} />
                 </View>
 
-                <Text style={styles.title}>{getTitle()}</Text>
-                <Text style={styles.message}>{getMessage()}</Text>
+                <Text style={[styles.title, { color: colors.text }]}>{getTitle()}</Text>
+                <Text style={[styles.message, { color: colors.textSecondary }]}>{getMessage()}</Text>
 
                 {params.contactInfo && (
-                    <View style={styles.contactCard}>
-                        <Text style={styles.contactLabel}>Founder Contact:</Text>
-                        <Text style={styles.contactInfo}>📞 {params.contactInfo}</Text>
+                    <View style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Text style={[styles.contactLabel, { color: colors.textSecondary }]}>Founder Contact:</Text>
+                        <Text style={[styles.contactInfo, { color: colors.primary }]}>📞 {params.contactInfo}</Text>
                     </View>
                 )}
 
@@ -81,7 +83,6 @@ export default function Success() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
     },
     content: {
         flex: 1,
@@ -95,37 +96,31 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: '700',
-        color: '#1E293B',
         textAlign: 'center',
         marginBottom: 16,
     },
     message: {
         fontSize: 16,
-        color: '#64748B',
         textAlign: 'center',
         lineHeight: 24,
         marginBottom: 32,
         maxWidth: 400,
     },
     contactCard: {
-        backgroundColor: '#FFFFFF',
         padding: 20,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
         marginBottom: 32,
         width: '100%',
         maxWidth: 400,
     },
     contactLabel: {
         fontSize: 14,
-        color: '#64748B',
         marginBottom: 8,
     },
     contactInfo: {
         fontSize: 20,
         fontWeight: '600',
-        color: '#3B82F6',
     },
     buttonContainer: {
         width: '100%',

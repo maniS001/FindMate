@@ -1,4 +1,5 @@
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface InputProps extends TextInputProps {
     label: string;
@@ -6,15 +7,26 @@ interface InputProps extends TextInputProps {
 }
 
 export default function Input({ label, error, style, ...props }: InputProps) {
+    const { colors } = useTheme();
+
     return (
         <View style={styles.container}>
-            <Text style={styles.label}>{label}</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
             <TextInput
-                style={[styles.input, error ? styles.inputError : null, style]}
-                placeholderTextColor="#94A3B8"
+                style={[
+                    styles.input,
+                    {
+                        backgroundColor: colors.surface,
+                        borderColor: error ? colors.error : colors.border,
+                        color: colors.text
+                    },
+                    error ? styles.inputError : null,
+                    style
+                ]}
+                placeholderTextColor={colors.textSecondary}
                 {...props}
             />
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {error && <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>}
         </View>
     );
 }
@@ -27,24 +39,19 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#475569',
         marginBottom: 8,
     },
     input: {
         height: 52,
-        backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: '#E2E8F0',
         borderRadius: 12,
         paddingHorizontal: 16,
         fontSize: 16,
-        color: '#1E293B',
     },
     inputError: {
-        borderColor: '#EF4444',
+        borderWidth: 2,
     },
     errorText: {
-        color: '#EF4444',
         fontSize: 12,
         marginTop: 4,
     },

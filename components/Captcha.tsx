@@ -1,12 +1,14 @@
 import { RefreshCw } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface CaptchaProps {
     onVerify: (isValid: boolean) => void;
 }
 
 export default function Captcha({ onVerify }: CaptchaProps) {
+    const { colors } = useTheme();
     const [captchaCode, setCaptchaCode] = useState('');
     const [input, setInput] = useState('');
 
@@ -36,15 +38,16 @@ export default function Captcha({ onVerify }: CaptchaProps) {
 
     return (
         <View style={styles.container}>
-            <View style={styles.captchaBox}>
-                <Text style={styles.captchaText}>{captchaCode.split('').join(' ')}</Text>
+            <View style={[styles.captchaBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.captchaText, { color: colors.text }]}>{captchaCode.split('').join(' ')}</Text>
                 <TouchableOpacity onPress={generateCaptcha} style={styles.refreshButton}>
-                    <RefreshCw size={20} color="#64748B" />
+                    <RefreshCw size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
             </View>
             <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
                 placeholder="Enter Captcha"
+                placeholderTextColor={colors.textSecondary}
                 value={input}
                 onChangeText={handleInputChange}
                 autoCapitalize="characters"
@@ -61,15 +64,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#E2E8F0',
         padding: 16,
         borderRadius: 12,
         marginBottom: 12,
+        borderWidth: 1,
     },
     captchaText: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#334155',
         letterSpacing: 4,
         fontFamily: 'monospace',
         textDecorationLine: 'line-through',
@@ -79,12 +81,9 @@ const styles = StyleSheet.create({
         padding: 8,
     },
     input: {
-        backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: '#CBD5E1',
         borderRadius: 12,
         padding: 16,
         fontSize: 16,
-        color: '#1E293B',
     },
 });

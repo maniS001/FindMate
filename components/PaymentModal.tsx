@@ -2,6 +2,7 @@ import { CreditCard } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Modal, StyleSheet, Text, View } from 'react-native';
 import { CONFIG } from '../constants/config';
+import { useTheme } from '../contexts/ThemeContext';
 import Button from './Button';
 
 interface PaymentModalProps {
@@ -11,6 +12,7 @@ interface PaymentModalProps {
 }
 
 export default function PaymentModal({ visible, onClose, onSuccess }: PaymentModalProps) {
+    const { colors } = useTheme();
     const [loading, setLoading] = useState(false);
 
     const handlePayment = () => {
@@ -27,18 +29,18 @@ export default function PaymentModal({ visible, onClose, onSuccess }: PaymentMod
     return (
         <Modal visible={visible} animationType="slide" transparent>
             <View style={styles.overlay}>
-                <View style={styles.modal}>
-                    <View style={styles.iconContainer}>
-                        <CreditCard size={48} color="#0F172A" />
+                <View style={[styles.modal, { backgroundColor: colors.surface }]}>
+                    <View style={[styles.iconContainer, { backgroundColor: colors.background }]}>
+                        <CreditCard size={48} color={colors.text} />
                     </View>
-                    <Text style={styles.title}>Processing Fee Required</Text>
-                    <Text style={styles.subtitle}>
+                    <Text style={[styles.title, { color: colors.text }]}>Processing Fee Required</Text>
+                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                         To reveal the contact information, a small processing fee is required.
                     </Text>
 
-                    <View style={styles.amountBox}>
-                        <Text style={styles.amountLabel}>Total Amount</Text>
-                        <Text style={styles.amount}>₹{CONFIG.PROCESSING_FEE}</Text>
+                    <View style={[styles.amountBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                        <Text style={[styles.amountLabel, { color: colors.textSecondary }]}>Total Amount</Text>
+                        <Text style={[styles.amount, { color: colors.text }]}>₹{CONFIG.PROCESSING_FEE}</Text>
                     </View>
 
                     <View style={styles.actions}>
@@ -69,7 +71,6 @@ const styles = StyleSheet.create({
         padding: 24,
     },
     modal: {
-        backgroundColor: '#FFF',
         borderRadius: 24,
         padding: 24,
         alignItems: 'center',
@@ -78,7 +79,6 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: '#F1F5F9',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
@@ -86,19 +86,16 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1E293B',
         textAlign: 'center',
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 14,
-        color: '#64748B',
         textAlign: 'center',
         marginBottom: 24,
     },
     amountBox: {
         width: '100%',
-        backgroundColor: '#F8FAFC',
         padding: 16,
         borderRadius: 16,
         flexDirection: 'row',
@@ -106,17 +103,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 24,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
     },
     amountLabel: {
         fontSize: 16,
-        color: '#64748B',
         fontWeight: '500',
     },
     amount: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#0F172A',
     },
     actions: {
         flexDirection: 'row',

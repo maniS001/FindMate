@@ -5,6 +5,7 @@ import { Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
+import { useTheme } from '../../contexts/ThemeContext';
 import { addComplaint, Item, searchItems } from '../../store';
 
 export default function SearchResults() {
@@ -18,6 +19,7 @@ export default function SearchResults() {
         imageUris: string;
     }>();
     const router = useRouter();
+    const { colors } = useTheme();
     const [results, setResults] = useState<Item[]>([]);
     const [filing, setFiling] = useState(false);
 
@@ -77,29 +79,29 @@ export default function SearchResults() {
                     )}
 
                     <View style={styles.itemHeader}>
-                        <Text style={styles.itemName}>{item.name}</Text>
+                        <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
                         <View style={styles.badge}>
                             <Text style={styles.badgeText}>Found</Text>
                         </View>
                     </View>
 
                     <View style={styles.row}>
-                        <MapPin size={16} color="#64748B" />
-                        <Text style={styles.itemMeta}>{item.location}</Text>
+                        <MapPin size={16} color={colors.textSecondary} />
+                        <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>{item.location}</Text>
                     </View>
 
                     <View style={styles.row}>
-                        <Calendar size={16} color="#64748B" />
-                        <Text style={styles.itemMeta}>{item.date}</Text>
+                        <Calendar size={16} color={colors.textSecondary} />
+                        <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>{item.date}</Text>
                     </View>
 
-                    <Text style={styles.description} numberOfLines={2}>
+                    <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
                         {item.description}
                     </Text>
 
-                    <View style={styles.footer}>
-                        <Text style={styles.claimText}>Tap to Claim</Text>
-                        <ChevronRight size={20} color="#3B82F6" />
+                    <View style={[styles.footer, { borderTopColor: colors.border }]}>
+                        <Text style={[styles.claimText, { color: colors.primary }]}>Tap to Claim</Text>
+                        <ChevronRight size={20} color={colors.primary} />
                     </View>
                 </Card>
             </TouchableOpacity>
@@ -107,10 +109,10 @@ export default function SearchResults() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['bottom']}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Results for "{params.name}"</Text>
-                <Text style={styles.subtitle}>{results.length} items found</Text>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+            <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+                <Text style={[styles.title, { color: colors.text }]}>Results for "{params.name}"</Text>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{results.length} items found</Text>
             </View>
 
             <FlatList
@@ -120,13 +122,13 @@ export default function SearchResults() {
                 contentContainerStyle={styles.list}
                 ListEmptyComponent={
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyText}>No items found matching your search.</Text>
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No items found matching your search.</Text>
                     </View>
                 }
             />
 
-            <View style={styles.complainButtonContainer}>
-                <Text style={styles.complainHint}>
+            <View style={[styles.complainButtonContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+                <Text style={[styles.complainHint, { color: colors.text }]}>
                     {results.length > 0
                         ? "Didn't find your item in the list above?"
                         : "No matches found?"}
@@ -137,7 +139,7 @@ export default function SearchResults() {
                     loading={filing}
                     variant="secondary"
                 />
-                <Text style={styles.complainSubtext}>
+                <Text style={[styles.complainSubtext, { color: colors.textSecondary }]}>
                     We'll notify you if someone reports finding a matching item
                 </Text>
             </View>
@@ -148,22 +150,17 @@ export default function SearchResults() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
     },
     header: {
         padding: 24,
-        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
     },
     title: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1E293B',
     },
     subtitle: {
         fontSize: 14,
-        color: '#64748B',
         marginTop: 4,
     },
     list: {
@@ -189,7 +186,6 @@ const styles = StyleSheet.create({
     itemName: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#1E293B',
     },
     badge: {
         backgroundColor: '#DCFCE7',
@@ -209,11 +205,9 @@ const styles = StyleSheet.create({
     },
     itemMeta: {
         fontSize: 14,
-        color: '#64748B',
     },
     description: {
         fontSize: 14,
-        color: '#475569',
         marginTop: 4,
         lineHeight: 20,
     },
@@ -224,12 +218,10 @@ const styles = StyleSheet.create({
         marginTop: 8,
         paddingTop: 12,
         borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
     },
     claimText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#3B82F6',
         marginRight: 4,
     },
     emptyState: {
@@ -238,25 +230,20 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 16,
-        color: '#64748B',
         textAlign: 'center',
     },
     complainButtonContainer: {
         padding: 24,
-        backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
-        borderTopColor: '#E2E8F0',
     },
     complainHint: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#1E293B',
         textAlign: 'center',
         marginBottom: 12,
     },
     complainSubtext: {
         fontSize: 13,
-        color: '#64748B',
         textAlign: 'center',
         marginTop: 8,
     },
