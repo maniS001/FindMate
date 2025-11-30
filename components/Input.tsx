@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -8,6 +9,7 @@ interface InputProps extends TextInputProps {
 
 export default function Input({ label, error, style, ...props }: InputProps) {
     const { colors } = useTheme();
+    const [isFocused, setIsFocused] = useState(false);
 
     return (
         <View style={styles.container}>
@@ -17,13 +19,22 @@ export default function Input({ label, error, style, ...props }: InputProps) {
                     styles.input,
                     {
                         backgroundColor: colors.surface,
-                        borderColor: error ? colors.error : colors.border,
+                        borderColor: error ? colors.error : (isFocused ? colors.primary : colors.border),
+                        borderWidth: isFocused ? 2 : 1,
                         color: colors.text
                     },
                     error ? styles.inputError : null,
                     style
                 ]}
                 placeholderTextColor={colors.textSecondary}
+                onFocus={(e) => {
+                    setIsFocused(true);
+                    props.onFocus?.(e);
+                }}
+                onBlur={(e) => {
+                    setIsFocused(false);
+                    props.onBlur?.(e);
+                }}
                 {...props}
             />
             {error && <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>}

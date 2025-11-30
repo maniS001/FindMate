@@ -1,11 +1,9 @@
 import { useRouter } from 'expo-router';
-import { Calendar, MapPin } from 'lucide-react-native';
+import { Calendar, MapPin, Search } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Button from '../../components/Button';
 import Card from '../../components/Card';
-import Input from '../../components/Input';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Complaint, getComplaints, searchComplaints } from '../../store';
 
@@ -38,68 +36,104 @@ export default function ViewComplaints() {
     };
 
     const renderItem = ({ item }: { item: Complaint }) => {
-        const images = item.imageUris ? JSON.parse(item.imageUris) : [];
+        let images: string[] = [];
+        try {
+            if (Array.isArray(item.imageUris)) {
+                images = item.imageUris;
+            } else {
+                const parsed = item.imageUris ? JSON.parse(item.imageUris) : [];
+                if (Array.isArray(parsed)) {
+                    images = parsed;
+                } else if (typeof parsed === 'string') {
+                    images = [parsed];
+                }
+            }
+        } catch (e) {
+            console.log('Error parsing images:', e);
+        }
 
         return (
-            <Card style={styles.card}>
-                {images.length > 0 && (
-                    <Image
-                        source={{ uri: images[0] }}
-                        style={styles.itemImage}
-                        resizeMode="cover"
-                    />
-                )}
+            <TouchableOpacity
+                onPress={() => router.push({
+                    pathname: '/founder/complaint-detail',
+                    params: { id: item.id }
+                })}
+                activeOpacity={0.9}
+            >
+                <Card style={styles.card}>
+                    {images.length > 0 && (
+                        <Image
+                            source={{ uri: images[0] }}
+                            style={styles.itemImage}
+                            resizeMode="cover"
+                        />
+                    )}
 
-                <View style={styles.itemHeader}>
-                    <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
-                    <View style={styles.badge}>
-                        <Text style={styles.badgeText}>Lost</Text>
+                    <View style={styles.itemHeader}>
+                        <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>Lost</Text>
+                        </View>
                     </View>
-                </View>
 
-                <View style={styles.row}>
-                    <MapPin size={16} color={colors.textSecondary} />
-                    <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>{item.location}</Text>
-                </View>
+                    <View style={styles.row}>
+                        <MapPin size={16} color={colors.textSecondary} />
+                        <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>{item.location}</Text>
+                    </View>
 
-                <View style={styles.row}>
-                    <Calendar size={16} color={colors.textSecondary} />
-                    <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>{item.date}</Text>
-                </View>
+                    <View style={styles.row}>
+                        <Calendar size={16} color={colors.textSecondary} />
+                        <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>{item.date}</Text>
+                    </View>
 
-                <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
-                    {item.description}
-                </Text>
+                    <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
+                        {item.description}
+                    </Text>
 
-                <View style={[styles.footer, { borderTopColor: colors.border }]}>
-                    <Text style={[styles.contact, { color: colors.text }]}>{item.contactInfo}</Text>
-                </View>
-            </Card>
+                    <View style={[styles.footer, { borderTopColor: colors.border }]}>
+                        <Text style={[styles.contact, { color: colors.text }]}>{item.contactInfo}</Text>
+                    </View>
+                </Card>
+            </TouchableOpacity>
         );
     };
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.title, { color: colors.text }]}>Lost Item Complaints</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                    Search complaints to check if someone is looking for the item you found
-                </Text>
-            </View>
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
                 keyboardVerticalOffset={0}
             >
-                <View style={[styles.searchBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-                    <Input
-                        label="Search"
-                        placeholder="Search by name, location, or category..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                    <Button title="Search" onPress={handleSearch} loading={loading} />
+                <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+                    <View style={styles.searchRow}>
+                        <TextInput
+                            style={[
+                                styles.searchInput,
+                                {
+                                    backgroundColor: colors.background,
+                                    borderColor: colors.border,
+                                    color: colors.text
+                                }
+                            ]}
+                            placeholder="Search by name, location, or category..."
+                            placeholderTextColor={colors.textSecondary}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            onSubmitEditing={handleSearch}
+                        />
+                        <TouchableOpacity
+                            onPress={handleSearch}
+                            style={[styles.searchButton, { backgroundColor: colors.primary }]}
+                            activeOpacity={0.7}
+                        >
+                            <Search size={20} color="#FFFFFF" />
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.searchHint, { color: colors.textSecondary }]}>
+                        Find complaints matching the item you found
+                    </Text>
                 </View>
 
                 <FlatList
@@ -132,16 +166,40 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: '700',
-        marginBottom: 8,
+        marginBottom: 0,
     },
     subtitle: {
         fontSize: 16,
         lineHeight: 24,
     },
-    searchBar: {
+    searchContainer: {
         padding: 16,
         borderBottomWidth: 1,
+        gap: 8,
+    },
+    searchRow: {
+        flexDirection: 'row',
         gap: 12,
+        alignItems: 'center',
+    },
+    searchInput: {
+        flex: 1,
+        height: 48,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        fontSize: 16,
+    },
+    searchButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    searchHint: {
+        fontSize: 13,
+        lineHeight: 18,
     },
     list: {
         padding: 16,

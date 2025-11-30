@@ -48,7 +48,7 @@ export default function SearchResults() {
                 date: params.date || new Date().toISOString().split('T')[0],
                 description: params.description || '',
                 contactInfo: params.contactInfo,
-                imageUris: params.imageUris || '[]',
+                imageUris: params.imageUris ? JSON.parse(params.imageUris) : [],
             });
             router.push({
                 pathname: '/success',
@@ -62,7 +62,29 @@ export default function SearchResults() {
     };
 
     const renderItem = ({ item }: { item: Item }) => {
-        const imageUris = item.imageUris || (item.imageUri ? [item.imageUri] : []);
+        let imageUris: string[] = [];
+        try {
+            if (Array.isArray(item.imageUris)) {
+                imageUris = item.imageUris;
+            } else if (typeof item.imageUris === 'string') {
+                // Try to parse if it looks like JSON array
+                const uriString = item.imageUris as string;
+                if (uriString.startsWith('[')) {
+                    const parsed = JSON.parse(uriString);
+                    if (Array.isArray(parsed)) imageUris = parsed;
+                } else {
+                    imageUris = [uriString];
+                }
+            }
+
+            // Fallback to imageUri if imageUris is empty
+            if (imageUris.length === 0 && item.imageUri) {
+                imageUris = [item.imageUri];
+            }
+        } catch (e) {
+            console.log('Error parsing images:', e);
+            if (item.imageUri) imageUris = [item.imageUri];
+        }
 
         return (
             <TouchableOpacity

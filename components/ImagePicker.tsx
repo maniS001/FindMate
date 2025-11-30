@@ -1,6 +1,6 @@
 import { Camera, Image as ImageIcon, X } from 'lucide-react-native';
 import { useState } from 'react';
-import { Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { pickImageFromGallery, takePhotoWithCamera } from '../services/ImagePickerService';
 
@@ -16,6 +16,11 @@ export default function CustomImagePicker({ label, onImagesSelected, initialImag
     const [modalVisible, setModalVisible] = useState(false);
 
     const handleImageSelection = async (method: 'camera' | 'gallery', multiple: boolean = false) => {
+        if (images.length >= 3) {
+            Alert.alert('Limit Reached', 'You can only upload up to 3 images.');
+            return;
+        }
+
         setModalVisible(false);
         if (method === 'camera') {
             const uri = await takePhotoWithCamera();
@@ -27,7 +32,15 @@ export default function CustomImagePicker({ label, onImagesSelected, initialImag
         } else {
             const uris = await pickImageFromGallery(multiple);
             if (uris.length > 0) {
-                const newImages = [...images, ...uris];
+                // Calculate how many more images we can add
+                const remainingSlots = 3 - images.length;
+                const imagesToAdd = uris.slice(0, remainingSlots);
+
+                if (uris.length > remainingSlots) {
+                    Alert.alert('Limit Reached', `Only ${remainingSlots} more image(s) allowed. First ${remainingSlots} selected images were added.`);
+                }
+
+                const newImages = [...images, ...imagesToAdd];
                 setImages(newImages);
                 onImagesSelected(newImages);
             }
@@ -67,16 +80,19 @@ export default function CustomImagePicker({ label, onImagesSelected, initialImag
                     </View>
                 ))}
 
-                <TouchableOpacity
-                    onPress={pickImage}
-                    style={[styles.addButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                    activeOpacity={0.8}
-                >
-                    <ImageIcon size={32} color={colors.textSecondary} />
-                    <Text style={[styles.addButtonText, { color: colors.textSecondary }]}>
-                        {images.length > 0 ? 'Add More' : 'Upload Photos'}
-                    </Text>
-                </TouchableOpacity>
+                {images.length < 3 && (
+                    <TouchableOpacity
+                        onPress={pickImage}
+                        style={[styles.addButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                        activeOpacity={0.8}
+                    >
+                        <ImageIcon size={32} color={colors.textSecondary} />
+                        <Text style={[styles.addButtonText, { color: colors.textSecondary }]}>
+                            {images.length > 0 ? 'Add More' : 'Upload Photos'}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: colors.textSecondary }}>(Max 3)</Text>
+                    </TouchableOpacity>
+                )}
             </ScrollView>
 
             <Modal

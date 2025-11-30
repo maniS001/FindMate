@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
+import CategoryPicker from '../../components/CategoryPicker';
+import DatePicker from '../../components/DatePicker';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -17,11 +19,11 @@ export default function FileComplaint() {
         name: '',
         category: '',
         location: '',
-        date: new Date().toISOString().split('T')[0],
         description: '',
         contactInfo: '',
         imageUris: [] as string[],
     });
+    const [date, setDate] = useState(new Date());
 
     const handleSubmit = async () => {
         if (!form.name || !form.category || !form.location || !form.contactInfo) {
@@ -31,14 +33,26 @@ export default function FileComplaint() {
 
         setLoading(true);
         try {
+            // Convert images to base64
+            const { convertImagesToBase64 } = await import('../../utils/imageUtils');
+            const base64Images = form.imageUris.length > 0
+                ? await convertImagesToBase64(form.imageUris)
+                : [];
+
             await addComplaint({
-                ...form,
-                imageUris: JSON.stringify(form.imageUris),
+                name: form.name,
+                category: form.category,
+                location: form.location,
+                date: date.toISOString().split('T')[0],
+                description: form.description,
+                contactInfo: form.contactInfo,
+                imageUris: base64Images,
             });
             Alert.alert('Success', 'Your complaint has been filed successfully! You will be notified if a match is found.', [
                 { text: 'OK', onPress: () => router.back() }
             ]);
         } catch (error) {
+            console.error('Submit error:', error);
             Alert.alert('Error', 'Failed to file complaint. Please try again.');
         } finally {
             setLoading(false);
@@ -69,11 +83,11 @@ export default function FileComplaint() {
                             onChangeText={(text) => setForm({ ...form, name: text })}
                         />
 
-                        <Input
+
+                        <CategoryPicker
                             label="Category *"
-                            placeholder="e.g. Electronics, Keys, Wallet"
                             value={form.category}
-                            onChangeText={(text) => setForm({ ...form, category: text })}
+                            onChange={(category) => setForm({ ...form, category })}
                         />
 
                         <Input
@@ -83,11 +97,10 @@ export default function FileComplaint() {
                             onChangeText={(text) => setForm({ ...form, location: text })}
                         />
 
-                        <Input
+                        <DatePicker
                             label="When did you lose it?"
-                            placeholder="YYYY-MM-DD"
-                            value={form.date}
-                            onChangeText={(text) => setForm({ ...form, date: text })}
+                            value={date}
+                            onChange={setDate}
                         />
 
                         <Input

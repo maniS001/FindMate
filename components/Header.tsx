@@ -29,16 +29,16 @@ export default function Header() {
     };
 
     return (
-        <SafeAreaView edges={['top']} style={{ backgroundColor: colors.surface }}>
-            <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <SafeAreaView edges={['top']} style={{ backgroundColor: colors.headerBackground }}>
+            <View style={[styles.header, { backgroundColor: colors.headerBackground, borderBottomColor: colors.headerBackground }]}>
                 <View style={styles.leftSection}>
                     {pathname !== '/' && (
                         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                            <ArrowLeft size={24} color={colors.text} />
+                            <ArrowLeft size={24} color={colors.headerText} />
                         </TouchableOpacity>
                     )}
                     <TouchableOpacity onPress={() => router.dismissAll()} activeOpacity={0.7}>
-                        <Text style={[styles.logo, { color: colors.primary }]}>FindMate</Text>
+                        <Text style={[styles.logo, { color: colors.headerText }]}>FindMate</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -46,23 +46,23 @@ export default function Header() {
                     {/* Theme Toggle */}
                     <TouchableOpacity
                         onPress={toggleTheme}
-                        style={[styles.iconButton, { backgroundColor: colors.background }]}
+                        style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
                         activeOpacity={0.7}
                     >
                         {theme === 'light' ? (
-                            <Moon size={20} color={colors.text} />
+                            <Moon size={20} color={colors.headerText} />
                         ) : (
-                            <Sun size={20} color={colors.text} />
+                            <Sun size={20} color={colors.headerText} />
                         )}
                     </TouchableOpacity>
 
                     {/* Menu Button */}
                     <TouchableOpacity
                         onPress={() => setMenuVisible(true)}
-                        style={[styles.iconButton, { backgroundColor: colors.background }]}
+                        style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
                         activeOpacity={0.7}
                     >
-                        <Menu size={20} color={colors.text} />
+                        <Menu size={20} color={colors.headerText} />
                     </TouchableOpacity>
                 </View>
 

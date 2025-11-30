@@ -17,6 +17,8 @@ interface ThemeContextType {
         card: string;
         error: string;
         success: string;
+        headerBackground: string;
+        headerText: string;
     };
 }
 
@@ -31,6 +33,8 @@ const lightColors = {
     card: '#FFFFFF',
     error: '#EF4444',
     success: '#10B981',
+    headerBackground: '#3B82F6',
+    headerText: '#FFFFFF',
 };
 
 const darkColors = {
@@ -44,6 +48,8 @@ const darkColors = {
     card: '#1E293B',
     error: '#F87171',
     success: '#34D399',
+    headerBackground: '#1E293B',
+    headerText: '#F1F5F9',
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);

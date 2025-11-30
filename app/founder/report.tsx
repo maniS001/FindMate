@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
+import CategoryPicker from '../../components/CategoryPicker';
+import DatePicker from '../../components/DatePicker';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -16,13 +18,13 @@ export default function ReportFoundItem() {
         name: '',
         category: '',
         location: '',
-        date: new Date().toISOString().split('T')[0],
         description: '',
         secretQuestion: '',
         secretAnswer: '',
         contactInfo: '',
-        imageUri: '',
+        imageUris: [] as string[],
     });
+    const [date, setDate] = useState(new Date());
 
     const handleSubmit = async () => {
         if (!form.name || !form.location || !form.secretQuestion || !form.secretAnswer || !form.contactInfo) {
@@ -32,14 +34,20 @@ export default function ReportFoundItem() {
 
         setLoading(true);
         try {
+            // Convert images to base64
+            const { convertImagesToBase64 } = await import('../../utils/imageUtils');
+            const base64Images = form.imageUris.length > 0
+                ? await convertImagesToBase64(form.imageUris)
+                : [];
+
             await addItem({
                 name: form.name,
                 category: form.category,
                 location: form.location,
-                date: form.date,
+                date: date.toISOString().split('T')[0],
                 description: form.description,
                 contactInfo: form.contactInfo,
-                imageUri: form.imageUri,
+                imageUris: base64Images,
                 questions: [
                     {
                         question: form.secretQuestion,
@@ -52,6 +60,7 @@ export default function ReportFoundItem() {
                 params: { type: 'report' }
             });
         } catch (error) {
+            console.error('Submit error:', error);
             Alert.alert('Error', 'Failed to report item. Please try again.');
         } finally {
             setLoading(false);
@@ -88,9 +97,9 @@ export default function ReportFoundItem() {
 
                     <View style={styles.form}>
                         <CustomImagePicker
-                            label="Item Photo"
-                            onImagesSelected={(uris) => setForm({ ...form, imageUri: uris[0] || '' })}
-                            initialImages={form.imageUri ? [form.imageUri] : []}
+                            label="Item Photos"
+                            onImagesSelected={(uris) => setForm({ ...form, imageUris: uris })}
+                            initialImages={form.imageUris}
                         />
 
                         <Input
@@ -100,11 +109,10 @@ export default function ReportFoundItem() {
                             onChangeText={(text) => setForm({ ...form, name: text })}
                         />
 
-                        <Input
+                        <CategoryPicker
                             label="Category"
-                            placeholder="e.g. Electronics, Keys, Wallet"
                             value={form.category}
-                            onChangeText={(text) => setForm({ ...form, category: text })}
+                            onChange={(category) => setForm({ ...form, category })}
                         />
 
                         <Input
@@ -114,11 +122,10 @@ export default function ReportFoundItem() {
                             onChangeText={(text) => setForm({ ...form, location: text })}
                         />
 
-                        <Input
+                        <DatePicker
                             label="Date Found"
-                            placeholder="YYYY-MM-DD"
-                            value={form.date}
-                            onChangeText={(text) => setForm({ ...form, date: text })}
+                            value={date}
+                            onChange={setDate}
                         />
 
                         <Input

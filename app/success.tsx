@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import { useTheme } from '../contexts/ThemeContext';
@@ -60,6 +60,14 @@ export default function Success() {
                     <View style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <Text style={[styles.contactLabel, { color: colors.textSecondary }]}>Founder Contact:</Text>
                         <Text style={[styles.contactInfo, { color: colors.primary }]}>📞 {params.contactInfo}</Text>
+                        <Button
+                            title="Call Owner"
+                            onPress={() => {
+                                const phone = params.contactInfo?.replace(/[^0-9+]/g, '') || '';
+                                Linking.openURL(`tel:${phone}`);
+                            }}
+                            style={{ marginTop: 16 }}
+                        />
                     </View>
                 )}
 

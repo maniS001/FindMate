@@ -30,21 +30,26 @@ export interface Complaint {
     date: string;
     description: string;
     contactInfo: string;
-    imageUris?: string;
+    imageUris?: string[];
     status: string;
     createdAt: string;
 }
 
 // ============= Item API =============
 
-export const addItem = async (item: Omit<Item, 'id' | 'createdAt'>) => {
+export const addItem = async (item: Omit<Item, 'id' | 'createdAt'> | FormData) => {
     try {
+        const isFormData = item instanceof FormData;
+        const headers: HeadersInit = isFormData ? {
+            'Accept': 'application/json',
+        } : {
+            'Content-Type': 'application/json',
+        };
+
         const response = await fetch(`${API_URL}/items`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(item),
+            headers,
+            body: isFormData ? item : JSON.stringify(item),
         });
 
         if (!response.ok) {

@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
+import CategoryPicker from '../../components/CategoryPicker';
+import DatePicker from '../../components/DatePicker';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -14,17 +16,18 @@ export default function SearchLostItem() {
         name: '',
         category: '',
         location: '',
-        date: '',
         description: '',
         contactInfo: '',
         imageUris: [] as string[],
     });
+    const [date, setDate] = useState(new Date());
 
     const handleSearch = () => {
         router.push({
             pathname: '/victim/results',
             params: {
                 ...form,
+                date: date.toISOString().split('T')[0],
                 imageUris: JSON.stringify(form.imageUris),
             }
         });
@@ -53,11 +56,10 @@ export default function SearchLostItem() {
                             onChangeText={(text) => setForm({ ...form, name: text })}
                         />
 
-                        <Input
+                        <CategoryPicker
                             label="Category"
-                            placeholder="e.g. Electronics, Keys, Wallet"
                             value={form.category}
-                            onChangeText={(text) => setForm({ ...form, category: text })}
+                            onChange={(category) => setForm({ ...form, category })}
                         />
 
                         <Input
@@ -67,11 +69,10 @@ export default function SearchLostItem() {
                             onChangeText={(text) => setForm({ ...form, location: text })}
                         />
 
-                        <Input
+                        <DatePicker
                             label="When did you lose it?"
-                            placeholder="YYYY-MM-DD"
-                            value={form.date}
-                            onChangeText={(text) => setForm({ ...form, date: text })}
+                            value={date}
+                            onChange={setDate}
                         />
 
                         <Input
