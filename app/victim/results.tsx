@@ -41,6 +41,15 @@ export default function SearchResults() {
 
         setFiling(true);
         try {
+            // Parse image URIs from params
+            const imageUris = params.imageUris ? JSON.parse(params.imageUris) : [];
+
+            // Convert images to base64
+            const { convertImagesToBase64 } = await import('../../utils/imageUtils');
+            const base64Images = imageUris.length > 0
+                ? await convertImagesToBase64(imageUris)
+                : [];
+
             await addComplaint({
                 name: params.name,
                 category: params.category || '',
@@ -48,7 +57,7 @@ export default function SearchResults() {
                 date: params.date || new Date().toISOString().split('T')[0],
                 description: params.description || '',
                 contactInfo: params.contactInfo,
-                imageUris: params.imageUris ? JSON.parse(params.imageUris) : [],
+                imageUris: base64Images,
             });
             router.push({
                 pathname: '/success',
