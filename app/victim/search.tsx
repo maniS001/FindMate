@@ -86,9 +86,10 @@ export default function SearchLostItem() {
 
                         <Input
                             label="Your Contact Info *"
-                            placeholder="Phone or Email"
+                            placeholder="Phone Number"
                             value={form.contactInfo}
                             onChangeText={(text) => setForm({ ...form, contactInfo: text })}
+                            keyboardType="phone-pad"
                         />
 
                         <CustomImagePicker

@@ -161,9 +161,10 @@ export default function ReportFoundItem() {
 
                         <Input
                             label="Your Contact Info (Hidden)"
-                            placeholder="Phone or Email (shared only after verification)"
+                            placeholder="Phone Number (shared only after verification)"
                             value={form.contactInfo}
                             onChangeText={(text) => setForm({ ...form, contactInfo: text })}
+                            keyboardType="phone-pad"
                         />
 
                         <Button

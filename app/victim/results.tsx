@@ -174,7 +174,8 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     header: {
-        padding: 24,
+        padding: 16,
+        paddingBottom: 12,
         borderBottomWidth: 1,
     },
     title: {
