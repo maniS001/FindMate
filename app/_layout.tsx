@@ -5,6 +5,7 @@ import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import Header from '../components/Header';
+import WebContainer from '../components/WebContainer';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 
 function RootLayoutContent() {
@@ -17,23 +18,25 @@ function RootLayoutContent() {
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: colors.background }}>
           <Header />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.background }
-            }}
-          >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="victim/search" />
-            <Stack.Screen name="victim/results" />
-            <Stack.Screen name="victim/claim/[id]" />
-            <Stack.Screen name="founder/report" />
-            <Stack.Screen name="founder/complaints" />
-            <Stack.Screen name="success" />
-            <Stack.Screen name="account" />
-            <Stack.Screen name="settings" />
-            <Stack.Screen name="about" />
-          </Stack>
+          <WebContainer>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.background }
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="victim/search" />
+              <Stack.Screen name="victim/results" />
+              <Stack.Screen name="victim/claim/[id]" />
+              <Stack.Screen name="founder/report" />
+              <Stack.Screen name="founder/complaints" />
+              <Stack.Screen name="success" />
+              <Stack.Screen name="account" />
+              <Stack.Screen name="settings" />
+              <Stack.Screen name="about" />
+            </Stack>
+          </WebContainer>
         </View>
       </SafeAreaProvider>
     </NavigationThemeProvider>

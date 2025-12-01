@@ -38,6 +38,41 @@ export default function DatePicker({ label, value, onChange, style }: DatePicker
         return `${year}-${month}-${day}`;
     };
 
+    if (Platform.OS === 'web') {
+        return (
+            <View style={[styles.container, style]}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
+                <View style={[
+                    styles.input,
+                    {
+                        backgroundColor: colors.surface,
+                        borderColor: isFocused ? colors.primary : colors.border,
+                        borderWidth: isFocused ? 2 : 1,
+                    }
+                ]}>
+                    {/* @ts-ignore - React Native Web supports standard HTML elements via createElement */}
+                    <input
+                        type="date"
+                        value={value.toISOString().split('T')[0]}
+                        onChange={(e: any) => onChange(new Date(e.target.value))}
+                        style={{
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            color: colors.text,
+                            fontSize: 16,
+                            width: '100%',
+                            height: '100%',
+                            outline: 'none',
+                            fontFamily: 'System',
+                            padding: 0,
+                            margin: 0,
+                        }}
+                    />
+                </View>
+            </View>
+        );
+    }
+
     return (
         <View style={[styles.container, style]}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
