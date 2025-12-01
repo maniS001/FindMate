@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Calendar, ChevronRight, MapPin } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
@@ -21,13 +21,19 @@ export default function SearchResults() {
     const router = useRouter();
     const { colors } = useTheme();
     const [results, setResults] = useState<Item[]>([]);
+    const [loading, setLoading] = useState(false);
     const [filing, setFiling] = useState(false);
 
     useEffect(() => {
         const fetchResults = async () => {
             if (params.name) {
-                const items = await searchItems(params.name);
-                setResults(items);
+                setLoading(true);
+                try {
+                    const items = await searchItems(params.name);
+                    setResults(items);
+                } finally {
+                    setLoading(false);
+                }
             }
         };
         fetchResults();
@@ -146,17 +152,24 @@ export default function SearchResults() {
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{results.length} items found</Text>
             </View>
 
-            <FlatList
-                data={results}
-                renderItem={renderItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.list}
-                ListEmptyComponent={
-                    <View style={styles.emptyState}>
-                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No items found matching your search.</Text>
-                    </View>
-                }
-            />
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Searching for items...</Text>
+                </View>
+            ) : (
+                <FlatList
+                    data={results}
+                    renderItem={renderItem}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.list}
+                    ListEmptyComponent={
+                        <View style={styles.emptyState}>
+                            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No items found matching your search.</Text>
+                        </View>
+                    }
+                />
+            )}
 
             <View style={[styles.complainButtonContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
                 <Text style={[styles.complainHint, { color: colors.text }]}>
@@ -278,5 +291,15 @@ const styles = StyleSheet.create({
         fontSize: 13,
         textAlign: 'center',
         marginTop: 8,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
     },
 });

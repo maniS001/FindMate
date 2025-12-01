@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Calendar, MapPin, Search } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../../components/Card';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -19,8 +19,13 @@ export default function ViewComplaints() {
     }, []);
 
     const loadComplaints = async () => {
-        const allComplaints = await getComplaints();
-        setComplaints(allComplaints);
+        setLoading(true);
+        try {
+            const allComplaints = await getComplaints();
+            setComplaints(allComplaints);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSearch = async () => {
@@ -30,9 +35,12 @@ export default function ViewComplaints() {
         }
 
         setLoading(true);
-        const results = await searchComplaints(searchQuery);
-        setComplaints(results);
-        setLoading(false);
+        try {
+            const results = await searchComplaints(searchQuery);
+            setComplaints(results);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const renderItem = ({ item }: { item: Complaint }) => {
@@ -136,20 +144,43 @@ export default function ViewComplaints() {
                     </Text>
                 </View>
 
-                <FlatList
-                    data={complaints}
-                    renderItem={renderItem}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={styles.list}
-                    keyboardShouldPersistTaps="handled"
-                    ListEmptyComponent={
-                        <View style={styles.empty}>
-                            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                                {searchQuery ? 'No matching complaints found' : 'No complaints yet'}
-                            </Text>
-                        </View>
-                    }
-                />
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading complaints...</Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={complaints}
+                        renderItem={renderItem}
+                        keyExtractor={item => item.id}
+                        contentContainerStyle={styles.list}
+                        keyboardShouldPersistTaps="handled"
+                        ListEmptyComponent={
+                            <View style={styles.empty}>
+                                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                    {searchQuery ? 'No matching complaints found' : 'No complaints yet'}
+                                </Text>
+                                <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                                    If you found an item that isn't listed here, please report it.
+                                </Text>
+                            </View>
+                        }
+                    />
+                )}
+
+                <View style={[styles.bottomAction, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+                    <Text style={[styles.actionText, { color: colors.text }]}>
+                        Didn't find a matching complaint?
+                    </Text>
+                    <TouchableOpacity
+                        style={[styles.reportButton, { backgroundColor: colors.primary }]}
+                        onPress={() => router.push('/founder/report')}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={styles.reportButtonText}>Report Found Item</Text>
+                    </TouchableOpacity>
+                </View>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -265,5 +296,42 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 16,
         textAlign: 'center',
+        marginBottom: 8,
+    },
+    emptySubtext: {
+        fontSize: 14,
+        textAlign: 'center',
+    },
+    bottomAction: {
+        padding: 24,
+        borderTopWidth: 1,
+        alignItems: 'center',
+        gap: 16,
+    },
+    actionText: {
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    reportButton: {
+        width: '100%',
+        height: 56,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    reportButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
     },
 });

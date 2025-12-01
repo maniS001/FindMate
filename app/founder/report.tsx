@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CategoryPicker from '../../components/CategoryPicker';
@@ -82,18 +82,7 @@ export default function ReportFoundItem() {
                     <Text style={[styles.heading, { color: colors.text }]}>Report Found Item</Text>
                     <Text style={[styles.subHeader, { color: colors.textSecondary }]}>Help the owner find their lost belonging.</Text>
 
-                    <TouchableOpacity
-                        style={[styles.complaintsLink, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                        onPress={() => router.push('/founder/complaints')}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={[styles.complaintsLinkText, { color: colors.text }]}>
-                            💡 Check Pending Complaints First
-                        </Text>
-                        <Text style={[styles.complaintsLinkDesc, { color: colors.textSecondary }]}>
-                            See if someone already filed a complaint about this item
-                        </Text>
-                    </TouchableOpacity>
+
 
                     <View style={styles.form}>
                         <CustomImagePicker
@@ -197,20 +186,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         marginBottom: 12,
     },
-    complaintsLink: {
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 24,
-        borderWidth: 1,
-    },
-    complaintsLinkText: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    complaintsLinkDesc: {
-        fontSize: 14,
-    },
+
     form: {
         gap: 8,
     },

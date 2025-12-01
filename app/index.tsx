@@ -43,7 +43,7 @@ export default function LandingScreen() {
 
                     <TouchableOpacity
                         style={[styles.card, styles.foundCard]}
-                        onPress={() => router.push('/founder/report')}
+                        onPress={() => router.push('/founder/complaints')}
                         activeOpacity={0.9}
                     >
                         <View style={styles.iconContainer}>
