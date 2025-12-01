@@ -20,9 +20,26 @@ export default function SearchLostItem() {
         contactInfo: '',
         imageUris: [] as string[],
     });
+    const [errors, setErrors] = useState({
+        name: '',
+        location: '',
+        contactInfo: '',
+    });
     const [date, setDate] = useState(new Date());
 
     const handleSearch = () => {
+        const newErrors = {
+            name: !form.name ? 'Item name is required' : '',
+            location: !form.location ? 'Location is required' : '',
+            contactInfo: !form.contactInfo ? 'Contact info is required' : '',
+        };
+
+        setErrors(newErrors);
+
+        if (newErrors.name || newErrors.location || newErrors.contactInfo) {
+            return;
+        }
+
         router.push({
             pathname: '/victim/results',
             params: {
@@ -53,7 +70,11 @@ export default function SearchLostItem() {
                             label="What did you lose? *"
                             placeholder="e.g. Keys, Wallet, Phone"
                             value={form.name}
-                            onChangeText={(text) => setForm({ ...form, name: text })}
+                            onChangeText={(text) => {
+                                setForm({ ...form, name: text });
+                                if (errors.name) setErrors({ ...errors, name: '' });
+                            }}
+                            error={errors.name}
                         />
 
                         <CategoryPicker
@@ -66,7 +87,11 @@ export default function SearchLostItem() {
                             label="Where did you lose it? *"
                             placeholder="e.g. Central Park"
                             value={form.location}
-                            onChangeText={(text) => setForm({ ...form, location: text })}
+                            onChangeText={(text) => {
+                                setForm({ ...form, location: text });
+                                if (errors.location) setErrors({ ...errors, location: '' });
+                            }}
+                            error={errors.location}
                         />
 
                         <DatePicker
@@ -88,8 +113,12 @@ export default function SearchLostItem() {
                             label="Your Contact Info *"
                             placeholder="Phone Number"
                             value={form.contactInfo}
-                            onChangeText={(text) => setForm({ ...form, contactInfo: text })}
+                            onChangeText={(text) => {
+                                setForm({ ...form, contactInfo: text });
+                                if (errors.contactInfo) setErrors({ ...errors, contactInfo: '' });
+                            }}
                             keyboardType="phone-pad"
+                            error={errors.contactInfo}
                         />
 
                         <CustomImagePicker
