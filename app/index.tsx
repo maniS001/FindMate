@@ -64,11 +64,11 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 24,
-        flexGrow: 1,
+        paddingBottom: 60,
     },
     header: {
-        marginTop: 40,
-        marginBottom: 60,
+        marginTop: 0,
+        marginBottom: 40,
     },
     title: {
         fontSize: 42,

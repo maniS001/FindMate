@@ -19,16 +19,36 @@ export default function ReportFoundItem() {
         category: '',
         location: '',
         description: '',
-        secretQuestion: '',
-        secretAnswer: '',
+        questions: [{ question: '', answer: '' }],
         contactInfo: '',
         imageUris: [] as string[],
     });
     const [date, setDate] = useState(new Date());
 
+    const handleAddQuestion = () => {
+        setForm({
+            ...form,
+            questions: [...form.questions, { question: '', answer: '' }]
+        });
+    };
+
+    const handleRemoveQuestion = (index: number) => {
+        const newQuestions = [...form.questions];
+        newQuestions.splice(index, 1);
+        setForm({ ...form, questions: newQuestions });
+    };
+
+    const handleQuestionChange = (text: string, index: number, field: 'question' | 'answer') => {
+        const newQuestions = [...form.questions];
+        newQuestions[index][field] = text;
+        setForm({ ...form, questions: newQuestions });
+    };
+
     const handleSubmit = async () => {
-        if (!form.name || !form.location || !form.secretQuestion || !form.secretAnswer || !form.contactInfo) {
-            Alert.alert('Missing Information', 'Please fill in all required fields');
+        const areQuestionsValid = form.questions.every(q => q.question.trim() && q.answer.trim());
+
+        if (!form.name || !form.location || !areQuestionsValid || !form.contactInfo) {
+            Alert.alert('Missing Information', 'Please fill in all required fields, including all security questions and answers.');
             return;
         }
 
@@ -48,12 +68,7 @@ export default function ReportFoundItem() {
                 description: form.description,
                 contactInfo: form.contactInfo,
                 imageUris: base64Images,
-                questions: [
-                    {
-                        question: form.secretQuestion,
-                        answer: form.secretAnswer,
-                    }
-                ],
+                questions: form.questions,
             });
             router.push({
                 pathname: '/success',
@@ -81,8 +96,6 @@ export default function ReportFoundItem() {
                 >
                     <Text style={[styles.heading, { color: colors.text }]}>Report Found Item</Text>
                     <Text style={[styles.subHeader, { color: colors.textSecondary }]}>Help the owner find their lost belonging.</Text>
-
-
 
                     <View style={styles.form}>
                         <CustomImagePicker
@@ -130,22 +143,44 @@ export default function ReportFoundItem() {
                         <View style={[styles.divider, { backgroundColor: colors.border }]} />
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>Verification Details</Text>
                         <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
-                            These details are hidden and used to verify the owner.
+                            Add one or more security questions. The owner must answer ALL of them correctly to claim the item.
                         </Text>
 
-                        <Input
-                            label="Secret Question"
-                            placeholder="e.g. What is the keychain character?"
-                            value={form.secretQuestion}
-                            onChangeText={(text) => setForm({ ...form, secretQuestion: text })}
-                        />
+                        {form.questions.map((q, index) => (
+                            <View key={index} style={styles.questionContainer}>
+                                <View style={styles.questionHeader}>
+                                    <Text style={[styles.questionLabel, { color: colors.textSecondary }]}>
+                                        Question {index + 1}
+                                    </Text>
+                                    {form.questions.length > 1 && (
+                                        <TouchableOpacity onPress={() => handleRemoveQuestion(index)}>
+                                            <Text style={{ color: colors.error, fontWeight: '600' }}>Remove</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
 
-                        <Input
-                            label="Secret Answer"
-                            placeholder="The correct answer to the question"
-                            secureTextEntry
-                            value={form.secretAnswer}
-                            onChangeText={(text) => setForm({ ...form, secretAnswer: text })}
+                                <Input
+                                    label="Secret Question"
+                                    placeholder="e.g. What is the keychain character?"
+                                    value={q.question}
+                                    onChangeText={(text) => handleQuestionChange(text, index, 'question')}
+                                />
+
+                                <Input
+                                    label="Secret Answer"
+                                    placeholder="The correct answer"
+                                    secureTextEntry
+                                    value={q.answer}
+                                    onChangeText={(text) => handleQuestionChange(text, index, 'answer')}
+                                />
+                            </View>
+                        ))}
+
+                        <Button
+                            title="+ Add Another Question"
+                            onPress={handleAddQuestion}
+                            variant="secondary"
+                            style={{ marginBottom: 24 }}
                         />
 
                         <Input
@@ -160,7 +195,7 @@ export default function ReportFoundItem() {
                             title="Report Item"
                             onPress={handleSubmit}
                             loading={loading}
-                            style={{ marginTop: 24 }}
+                            style={{ marginTop: 8 }}
                         />
                     </View>
                 </ScrollView>
@@ -202,5 +237,18 @@ const styles = StyleSheet.create({
     sectionDesc: {
         fontSize: 14,
         marginBottom: 24,
+    },
+    questionContainer: {
+        marginBottom: 16,
+    },
+    questionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    questionLabel: {
+        fontSize: 14,
+        fontWeight: '600',
     },
 });

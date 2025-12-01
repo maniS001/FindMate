@@ -32,17 +32,42 @@ export default function Header() {
         <SafeAreaView edges={['top']} style={{ backgroundColor: colors.headerBackground }}>
             <View style={[styles.header, { backgroundColor: colors.headerBackground, borderBottomColor: colors.headerBackground }]}>
                 <View style={styles.leftSection}>
-                    {pathname !== '/' && (
-                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                            <ArrowLeft size={24} color={colors.headerText} />
+                    {pathname === '/' && (
+                        <TouchableOpacity
+                            onPress={() => router.push('/account' as never)}
+                            style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
+                            activeOpacity={0.7}
+                        >
+                            <User size={20} color={colors.headerText} />
                         </TouchableOpacity>
                     )}
-                    <TouchableOpacity onPress={() => router.dismissAll()} activeOpacity={0.7}>
-                        <Text style={[styles.logo, { color: colors.headerText }]}>FindMate</Text>
-                    </TouchableOpacity>
+
+                    {pathname !== '/' && (
+                        <>
+                            {pathname !== '/' && pathname !== '/account' && pathname !== '/settings' && pathname !== '/about' && (
+                                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                                    <ArrowLeft size={24} color={colors.headerText} />
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity onPress={() => router.dismissAll()} activeOpacity={0.7}>
+                                <Text style={[styles.logo, { color: colors.headerText }]}>FindMate</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
                 </View>
 
                 <View style={styles.actions}>
+                    {/* User Icon (on right for non-home pages) */}
+                    {pathname !== '/' && (
+                        <TouchableOpacity
+                            onPress={() => router.push('/account' as never)}
+                            style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
+                            activeOpacity={0.7}
+                        >
+                            <User size={20} color={colors.headerText} />
+                        </TouchableOpacity>
+                    )}
+
                     {/* Theme Toggle */}
                     <TouchableOpacity
                         onPress={toggleTheme}

@@ -107,12 +107,16 @@ export default function SearchResults() {
                 activeOpacity={0.9}
             >
                 <Card style={styles.itemCard}>
-                    {imageUris.length > 0 && (
+                    {imageUris.length > 0 ? (
                         <Image
                             source={{ uri: imageUris[0] }}
                             style={styles.itemImage}
                             resizeMode="cover"
                         />
+                    ) : (
+                        <View style={[styles.itemImage, styles.noImagePlaceholder, { backgroundColor: colors.surface }]}>
+                            <Text style={[styles.noImageText, { color: colors.textSecondary }]}>No Image</Text>
+                        </View>
                     )}
 
                     <View style={styles.itemHeader}>
@@ -301,5 +305,13 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 16,
         fontSize: 16,
+    },
+    noImagePlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    noImageText: {
+        fontSize: 14,
+        fontWeight: '500',
     },
 });

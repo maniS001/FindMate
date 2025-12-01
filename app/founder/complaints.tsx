@@ -69,12 +69,16 @@ export default function ViewComplaints() {
                 activeOpacity={0.9}
             >
                 <Card style={styles.card}>
-                    {images.length > 0 && (
+                    {images.length > 0 ? (
                         <Image
                             source={{ uri: images[0] }}
                             style={styles.itemImage}
                             resizeMode="cover"
                         />
+                    ) : (
+                        <View style={[styles.itemImage, styles.noImagePlaceholder, { backgroundColor: colors.surface }]}>
+                            <Text style={[styles.noImageText, { color: colors.textSecondary }]}>No Image</Text>
+                        </View>
                     )}
 
                     <View style={styles.itemHeader}>
@@ -178,7 +182,7 @@ export default function ViewComplaints() {
                         onPress={() => router.push('/founder/report')}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.reportButtonText}>Report Found Item</Text>
+                        <Text style={styles.reportButtonText}>Report New Item</Text>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -333,5 +337,13 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 16,
         fontSize: 16,
+    },
+    noImagePlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    noImageText: {
+        fontSize: 14,
+        fontWeight: '500',
     },
 });
