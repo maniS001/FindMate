@@ -114,7 +114,7 @@ export default function SearchResults() {
                             resizeMode="cover"
                         />
                     ) : (
-                        <View style={[styles.itemImage, styles.noImagePlaceholder, { backgroundColor: colors.surface }]}>
+                        <View style={[styles.itemImage, styles.noImagePlaceholder, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                             <Text style={[styles.noImageText, { color: colors.textSecondary }]}>No Image</Text>
                         </View>
                     )}
@@ -309,9 +309,11 @@ const styles = StyleSheet.create({
     noImagePlaceholder: {
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 2,
+        borderStyle: 'dashed',
     },
     noImageText: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
     },
 });
