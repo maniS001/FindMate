@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { ArrowLeft, FileText, LogOut, Package } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API_URL } from '../constants/api';
@@ -14,9 +14,11 @@ export default function AccountScreen() {
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        fetchProfile();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            fetchProfile();
+        }, [])
+    );
 
     const fetchProfile = async () => {
         try {
