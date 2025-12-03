@@ -1,7 +1,7 @@
 // Utility to wake up the backend server on app start
 // This prevents the first API call from taking too long due to cold start
 
-const API_URL = 'http://10.56.226.180:3000/api';
+import { API_URL } from '../constants/api';
 
 export const wakeUpServer = async () => {
     try {
