@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import { findMatchingComplaints } from './matching';
 
 // Load environment variables
@@ -10,14 +12,131 @@ dotenv.config();
 const app = express();
 const prisma = new PrismaClient();
 const port = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 app.use(cors());
 app.use(express.json());
 
-// Create Item
+// Middleware to authenticate token
+const authenticateToken = (req: any, res: any, next: any) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.sendStatus(401);
+
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+};
+
+// ============= Auth Endpoints =============
+
+// Signup
+app.post('/api/auth/signup', async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (existingUser) return res.status(400).json({ error: 'Email already exists' });
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await prisma.user.create({
+            data: { name, email, password: hashedPassword },
+        });
+
+        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET);
+        res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Signup failed' });
+    }
+});
+
+// Login
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        if (!user || !user.password) return res.status(400).json({ error: 'Invalid credentials' });
+
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
+
+        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET);
+        res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Login failed' });
+    }
+});
+
+// Google Login (Mock/Simplified)
+app.post('/api/auth/google', async (req, res) => {
+    try {
+        const { email, name, googleId } = req.body;
+
+        let user = await prisma.user.findUnique({ where: { email } });
+
+        if (!user) {
+            user = await prisma.user.create({
+                data: { email, name, googleId, password: '' }, // No password for Google users
+            });
+        } else if (!user.googleId) {
+            // Link existing account
+            user = await prisma.user.update({
+                where: { id: user.id },
+                data: { googleId },
+            });
+        }
+
+        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET);
+        res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Google auth failed' });
+    }
+});
+
+// Get Current User Profile & History
+app.get('/api/auth/me', authenticateToken, async (req: any, res) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: req.user.id },
+            include: {
+                items: { orderBy: { createdAt: 'desc' } },
+                complaints: { orderBy: { createdAt: 'desc' } },
+                notifications: { orderBy: { createdAt: 'desc' } },
+            },
+        });
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+});
+
+// ============= Notification Endpoints =============
+
+app.get('/api/notifications', authenticateToken, async (req: any, res) => {
+    try {
+        const notifications = await prisma.notification.findMany({
+            where: { userId: req.user.id },
+            orderBy: { createdAt: 'desc' },
+        });
+        res.json(notifications);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+});
+
+// ============= Existing Endpoints (Updated with userId optional) =============
+
+// Create Item (Updated to link user)
 app.post('/api/items', async (req, res) => {
     try {
-        const { name, category, location, date, description, contactInfo, imageUri, imageUris, questions } = req.body;
+        const { name, category, location, date, description, contactInfo, imageUri, imageUris, questions, userId } = req.body;
 
         // Handle both imageUri (single) and imageUris (array)
         const images = imageUris || (imageUri ? [imageUri] : []);
@@ -35,6 +154,7 @@ app.post('/api/items', async (req, res) => {
                 questions: {
                     create: questions,
                 },
+                userId: userId || null, // Link to user if provided
             },
             include: {
                 questions: true,
@@ -43,6 +163,9 @@ app.post('/api/items', async (req, res) => {
 
         // Check for matching complaints
         const matches = await findMatchingComplaints({ name, category, location, date }, prisma);
+
+        // Create notification for matching complaints (Mock logic for now)
+        // In real app, we'd find the user of the complaint and notify them
 
         res.json({
             item,
@@ -58,6 +181,31 @@ app.post('/api/items', async (req, res) => {
         res.status(500).json({ error: 'Failed to create item' });
     }
 });
+
+// Create Complaint (Updated to link user)
+app.post('/api/complaints', async (req, res) => {
+    try {
+        const { name, category, location, date, description, contactInfo, imageUris, userId } = req.body;
+        const complaint = await prisma.complaint.create({
+            data: {
+                name,
+                category,
+                location,
+                date,
+                description,
+                contactInfo,
+                imageUris: imageUris ? JSON.stringify(imageUris) : '[]',
+                userId: userId || null,
+            },
+        });
+        res.json(complaint);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to create complaint' });
+    }
+});
+
+// ... (Rest of existing endpoints remain same)
 
 // List Items (with search)
 app.get('/api/items', async (req, res) => {
@@ -100,30 +248,6 @@ app.get('/api/items/:id', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch item' });
-    }
-});
-
-// ============= Complaint Endpoints =============
-
-// Create Complaint
-app.post('/api/complaints', async (req, res) => {
-    try {
-        const { name, category, location, date, description, contactInfo, imageUris } = req.body;
-        const complaint = await prisma.complaint.create({
-            data: {
-                name,
-                category,
-                location,
-                date,
-                description,
-                contactInfo,
-                imageUris: imageUris ? JSON.stringify(imageUris) : '[]',
-            },
-        });
-        res.json(complaint);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to create complaint' });
     }
 });
 
@@ -170,7 +294,7 @@ app.get('/api/complaints/:id', async (req, res) => {
     }
 });
 
-// ============= Security Endpoints =============
+// ============= Security Endpoints (Existing) =============
 
 // In-memory storage for OTPs and CAPTCHAs (in production, use Redis)
 const otpStore = new Map<string, { code: string; expires: number }>();

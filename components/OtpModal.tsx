@@ -1,8 +1,12 @@
-import { useState } from 'react';
-import { Alert, Modal, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import Button from './Button';
 import Input from './Input';
+
+import { API_URL } from '../constants/api';
+
+// API Configuration is now managed in constants/api.ts
 
 interface OtpModalProps {
     visible: boolean;
@@ -16,37 +20,117 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
+    const [timer, setTimer] = useState(0);
 
-    const handleSendOtp = () => {
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval>;
+        if (timer > 0) {
+            interval = setInterval(() => {
+                setTimer((prev) => prev - 1);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [timer]);
+
+    const handleSendOtp = async () => {
         if (phone.length < 10) {
             Alert.alert('Error', 'Please enter a valid phone number');
             return;
         }
         setLoading(true);
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            const response = await fetch(`${API_URL}/otp/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone }),
+            });
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.error || 'Failed to send OTP');
+
             setStep('otp');
-            Alert.alert('OTP Sent', 'Use 123456 as OTP');
-        }, 1500);
+            setTimer(60);
+
+            // For testing, show the code in alert (since we don't have real SMS)
+            if (data.debugCode) {
+                Alert.alert('OTP Sent', `Your verification code is: ${data.debugCode}`);
+            } else {
+                Alert.alert('OTP Sent', 'Please check your phone for the verification code.');
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleVerifyOtp = () => {
-        if (otp !== '123456') {
-            Alert.alert('Error', 'Invalid OTP');
+    const handleResendOtp = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/otp/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone }),
+            });
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.error || 'Failed to resend OTP');
+
+            setTimer(60);
+
+            if (data.debugCode) {
+                Alert.alert('OTP Resent', `Your new verification code is: ${data.debugCode}`);
+            } else {
+                Alert.alert('OTP Resent', 'Please check your phone for the new verification code.');
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        if (otp.length !== 6) {
+            Alert.alert('Error', 'Please enter a valid 6-digit OTP');
             return;
         }
         setLoading(true);
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            const response = await fetch(`${API_URL}/otp/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, code: otp }),
+            });
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.error || 'Invalid OTP');
+
             onVerified();
-            setStep('phone');
-            setPhone('');
-            setOtp('');
-        }, 1000);
+            handleClose();
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleClose = () => {
+        setStep('phone');
+        setPhone('');
+        setOtp('');
+        setTimer(0);
+        onClose();
+    };
+
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     return (
-        <Modal visible={visible} animationType="slide" transparent>
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
             <View style={styles.overlay}>
                 <View style={[styles.modal, { backgroundColor: colors.surface }]}>
                     <Text style={[styles.title, { color: colors.text }]}>
@@ -67,20 +151,36 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
                             onChangeText={setPhone}
                         />
                     ) : (
-                        <Input
-                            label="OTP Code"
-                            placeholder="123456"
-                            keyboardType="number-pad"
-                            value={otp}
-                            onChangeText={setOtp}
-                        />
+                        <View>
+                            <Input
+                                label="OTP Code"
+                                placeholder="Enter 6-digit code"
+                                keyboardType="number-pad"
+                                value={otp}
+                                onChangeText={setOtp}
+                                maxLength={6}
+                            />
+                            <View style={styles.resendContainer}>
+                                {timer > 0 ? (
+                                    <Text style={[styles.timerText, { color: colors.textSecondary }]}>
+                                        Resend code in {formatTime(timer)}
+                                    </Text>
+                                ) : (
+                                    <TouchableOpacity onPress={handleResendOtp} disabled={loading}>
+                                        <Text style={[styles.resendText, { color: colors.primary }]}>
+                                            Resend OTP
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
                     )}
 
                     <View style={styles.actions}>
                         <Button
                             title="Cancel"
                             variant="secondary"
-                            onPress={onClose}
+                            onPress={handleClose}
                             style={{ flex: 1 }}
                         />
                         <Button
@@ -122,5 +222,17 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 12,
         marginTop: 8,
+    },
+    resendContainer: {
+        alignItems: 'center',
+        marginTop: 8,
+        marginBottom: 8,
+    },
+    timerText: {
+        fontSize: 14,
+    },
+    resendText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
 });

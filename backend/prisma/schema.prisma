@@ -7,7 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String?  // Optional for Google Auth users
+  name        String
+  googleId    String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  items       Item[]
+  complaints  Complaint[]
+  notifications Notification[]
+}
 
 model Item {
   id          String     @id @default(uuid())
@@ -20,6 +32,9 @@ model Item {
   imageUris   String[]
   questions   Question[]
   createdAt   DateTime   @default(now())
+  
+  userId      String?
+  user        User?      @relation(fields: [userId], references: [id])
 }
 
 model Question {
@@ -41,4 +56,18 @@ model Complaint {
   imageUris   String
   status      String   @default("open")
   createdAt   DateTime @default(now())
+  
+  userId      String?
+  user        User?      @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
 }

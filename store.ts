@@ -1,13 +1,8 @@
+import { API_URL } from './constants/api';
 
-// API Configuration
-// For real Android device, use your computer's IP address (both must be on same WiFi)
-// Computer IP: 10.56.226.180
-const API_URL = 'https://findmate-backend-her6.onrender.com/api';
+// API Configuration is now managed in constants/api.ts
 
-// = Platform.OS === 'android'
-//     ? 'http://10.56.226.180:3000/api'  // For Android device on same WiFi
-//     : 'http://localhost:3000/api';  // For web and iOS
-
+// Data Models
 // Data Models
 export interface Item {
     id: string;
@@ -20,6 +15,7 @@ export interface Item {
     contactInfo: string;
     imageUri?: string; // Main image for backward compatibility/preview
     imageUris?: string[]; // All images
+    userId?: string;
 }
 
 export interface Complaint {
@@ -33,6 +29,7 @@ export interface Complaint {
     imageUris?: string[];
     status: string;
     createdAt: string;
+    userId?: string;
 }
 
 // ============= Item API =============

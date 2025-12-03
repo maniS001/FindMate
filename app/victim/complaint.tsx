@@ -7,12 +7,14 @@ import CategoryPicker from '../../components/CategoryPicker';
 import DatePicker from '../../components/DatePicker';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
+import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { addComplaint } from '../../store';
 
 export default function FileComplaint() {
     const router = useRouter();
     const { colors } = useTheme();
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
 
     const [form, setForm] = useState({
@@ -47,6 +49,7 @@ export default function FileComplaint() {
                 description: form.description,
                 contactInfo: form.contactInfo,
                 imageUris: base64Images,
+                userId: user?.id, // Link to current user
             });
             Alert.alert('Success', 'Your complaint has been filed successfully! You will be notified if a match is found.', [
                 { text: 'OK', onPress: () => router.back() }

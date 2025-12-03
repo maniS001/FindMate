@@ -1,18 +1,20 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CategoryPicker from '../../components/CategoryPicker';
 import DatePicker from '../../components/DatePicker';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
+import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { addItem } from '../../store';
 
 export default function ReportFoundItem() {
     const router = useRouter();
     const { colors } = useTheme();
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState({
         name: '',
@@ -69,6 +71,7 @@ export default function ReportFoundItem() {
                 contactInfo: form.contactInfo,
                 imageUris: base64Images,
                 questions: form.questions,
+                userId: user?.id, // Link to current user
             });
             router.push({
                 pathname: '/success',

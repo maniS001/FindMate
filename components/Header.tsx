@@ -1,5 +1,5 @@
 import { usePathname, useRouter } from 'expo-router';
-import { ArrowLeft, Info, Menu, Moon, Settings, Sun, User } from 'lucide-react-native';
+import { ArrowLeft, Bell, Info, Menu, Moon, Settings, Sun, User } from 'lucide-react-native';
 import { useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -67,6 +67,15 @@ export default function Header() {
                             <User size={20} color={colors.headerText} />
                         </TouchableOpacity>
                     )}
+
+                    {/* Notifications */}
+                    <TouchableOpacity
+                        onPress={() => router.push('/notifications' as never)}
+                        style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
+                        activeOpacity={0.7}
+                    >
+                        <Bell size={20} color={colors.headerText} />
+                    </TouchableOpacity>
 
                     {/* Theme Toggle */}
                     <TouchableOpacity
