@@ -31,6 +31,9 @@ export default function Header() {
         }
     };
 
+    const hideHeaderRoutes = ['/account', '/settings', '/about', '/notifications'];
+    if (hideHeaderRoutes.includes(pathname)) return null;
+
     return (
         <SafeAreaView edges={['top']} style={{ backgroundColor: colors.headerBackground }}>
             <View style={[styles.header, { backgroundColor: colors.headerBackground, borderBottomColor: colors.headerBackground }]}>
@@ -38,9 +41,7 @@ export default function Header() {
                     {pathname === '/' && (
                         <TouchableOpacity
                             onPress={() => {
-                                if (pathname !== '/account') {
-                                    router.push('/account' as never);
-                                }
+                                router.push('/account' as never);
                             }}
                             style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
                             activeOpacity={0.7}

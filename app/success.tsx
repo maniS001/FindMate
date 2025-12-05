@@ -172,7 +172,7 @@ export default function Success() {
                 </View>
             </Modal>
 
-            <View style={styles.content}>
+            <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.iconContainer}>
                     <CheckCircle size={80} color={colors.success} strokeWidth={2} />
                 </View>
@@ -224,7 +224,7 @@ export default function Success() {
                         variant="secondary"
                     />
                 </View>
-            </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     content: {
-        flex: 1,
+        flexGrow: 1,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 24,
