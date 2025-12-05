@@ -294,6 +294,45 @@ app.get('/api/complaints/:id', async (req, res) => {
     }
 });
 
+// Update Item Status
+app.patch('/api/items/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        const item = await prisma.item.update({
+            where: { id },
+            data: { status },
+        });
+        res.json(item);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update item status' });
+    }
+});
+
+// Update Complaint Status
+app.patch('/api/complaints/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, closureReason, reopenReason, resolvedAt } = req.body;
+
+        const data: any = { status };
+        if (closureReason) data.closureReason = closureReason;
+        if (reopenReason) data.reopenReason = reopenReason;
+        if (resolvedAt) data.resolvedAt = resolvedAt;
+
+        const complaint = await prisma.complaint.update({
+            where: { id },
+            data,
+        });
+        res.json(complaint);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update complaint status' });
+    }
+});
+
 // ============= Security Endpoints (Existing) =============
 
 // In-memory storage for OTPs and CAPTCHAs (in production, use Redis)

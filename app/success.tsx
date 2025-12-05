@@ -1,22 +1,51 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle } from 'lucide-react-native';
-import { useState } from 'react';
-import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { updateItemStatus } from '../store';
+import { Complaint, getComplaints, updateComplaintStatus, updateItemStatus } from '../store';
 
 export default function Success() {
     const router = useRouter();
     const { colors } = useTheme();
+    const { user } = useAuth();
     const params = useLocalSearchParams<{
         type: string;
         message: string;
         contactInfo?: string;
-        itemId?: string; // Added itemId to params
+        itemId?: string;
     }>();
     const [updating, setUpdating] = useState(false);
+
+    // Complaint Closure State
+    const [showComplaintModal, setShowComplaintModal] = useState(false);
+    const [userComplaints, setUserComplaints] = useState<Complaint[]>([]);
+    const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (params.itemId && user) {
+            fetchUserComplaints();
+        }
+    }, [params.itemId, user]);
+
+    const fetchUserComplaints = async () => {
+        try {
+            // In a real app, we should have an endpoint to get complaints by userId
+            // For now, we fetch all and filter (not efficient but works for prototype)
+            // Or use the profile endpoint data if available in context
+            const allComplaints = await getComplaints();
+            const myOpenComplaints = allComplaints.filter(c =>
+                c.userId === user?.id &&
+                (c.status === 'OPEN' || !c.status) // Handle undefined status as open
+            );
+            setUserComplaints(myOpenComplaints);
+        } catch (error) {
+            console.error('Failed to fetch complaints', error);
+        }
+    };
 
     const getTitle = () => {
         switch (params.type) {
@@ -55,20 +84,94 @@ export default function Success() {
 
         setUpdating(true);
         try {
-            // Mark item as CLAIMED (or RESOLVED depending on logic, but CLAIMED fits 'got it')
+            // 1. Update Item Status
             await updateItemStatus(params.itemId, 'CLAIMED');
-            Alert.alert('Great!', 'We are happy you found your item. The item status has been updated.', [
-                { text: 'OK', onPress: () => router.push('/') }
-            ]);
+
+            // 2. Check if there are open complaints to close
+            if (userComplaints.length > 0) {
+                setShowComplaintModal(true);
+            } else {
+                Alert.alert('Great!', 'We are happy you found your item. The item status has been updated.', [
+                    { text: 'OK', onPress: () => router.push('/') }
+                ]);
+            }
         } catch (error) {
-            Alert.alert('Error', 'Failed to update item status.');
+            Alert.alert('Error', 'Failed to update item status. Please try again.');
         } finally {
             setUpdating(false);
         }
     };
 
+    const handleCloseComplaint = async () => {
+        if (!selectedComplaintId) {
+            // User chose not to close any complaint or "Skip"
+            router.push('/');
+            return;
+        }
+
+        try {
+            await updateComplaintStatus(selectedComplaintId, 'RESOLVED', 'Item recovered via FindMate');
+            Alert.alert('Success', 'Item marked as recovered and complaint closed!', [
+                { text: 'OK', onPress: () => router.push('/') }
+            ]);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to close complaint.');
+        }
+    };
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+            {/* Complaint Closure Modal */}
+            <Modal visible={showComplaintModal} transparent animationType="slide">
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>Close Related Complaint?</Text>
+                        <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+                            You have open complaints. Does this item resolve one of them?
+                        </Text>
+
+                        <ScrollView style={{ maxHeight: 200, marginVertical: 16 }}>
+                            {userComplaints.map(complaint => (
+                                <TouchableOpacity
+                                    key={complaint.id}
+                                    style={[
+                                        styles.complaintItem,
+                                        {
+                                            borderColor: selectedComplaintId === complaint.id ? colors.primary : colors.border,
+                                            backgroundColor: selectedComplaintId === complaint.id ? colors.primary + '10' : 'transparent'
+                                        }
+                                    ]}
+                                    onPress={() => setSelectedComplaintId(complaint.id)}
+                                >
+                                    <View style={styles.complaintInfo}>
+                                        <Text style={[styles.complaintName, { color: colors.text }]}>{complaint.name}</Text>
+                                        <Text style={[styles.complaintDate, { color: colors.textSecondary }]}>{complaint.date}</Text>
+                                    </View>
+                                    {selectedComplaintId === complaint.id && (
+                                        <CheckCircle size={20} color={colors.primary} />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <View style={styles.modalActions}>
+                            <Button
+                                title="Skip"
+                                variant="outline"
+                                onPress={() => router.push('/')}
+                                style={{ flex: 1 }}
+                            />
+                            <Button
+                                title="Close Complaint"
+                                onPress={handleCloseComplaint}
+                                disabled={!selectedComplaintId}
+                                style={{ flex: 1 }}
+                            />
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
             <View style={styles.content}>
                 <View style={styles.iconContainer}>
                     <CheckCircle size={80} color={colors.success} strokeWidth={2} />
@@ -190,5 +293,48 @@ const styles = StyleSheet.create({
     buttonContainer: {
         width: '100%',
         maxWidth: 400,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    modalContent: {
+        borderRadius: 24,
+        padding: 24,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        marginBottom: 8,
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        marginBottom: 16,
+    },
+    complaintItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginBottom: 8,
+    },
+    complaintInfo: {
+        flex: 1,
+    },
+    complaintName: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    complaintDate: {
+        fontSize: 12,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 8,
     },
 });

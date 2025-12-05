@@ -31,6 +31,7 @@ model Item {
   contactInfo String
   imageUris   String[]
   questions   Question[]
+  status      String     @default("OPEN") // Added status
   createdAt   DateTime   @default(now())
   
   userId      String?
@@ -54,7 +55,10 @@ model Complaint {
   description String
   contactInfo String
   imageUris   String
-  status      String   @default("open")
+  status      String   @default("OPEN")
+  closureReason String? // Added
+  reopenReason  String? // Added
+  resolvedAt    DateTime? // Added
   createdAt   DateTime @default(now())
   
   userId      String?
