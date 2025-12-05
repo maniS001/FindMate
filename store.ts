@@ -3,7 +3,6 @@ import { API_URL } from './constants/api';
 // API Configuration is now managed in constants/api.ts
 
 // Data Models
-// Data Models
 export interface Item {
     id: string;
     name: string;
@@ -16,6 +15,7 @@ export interface Item {
     imageUri?: string; // Main image for backward compatibility/preview
     imageUris?: string[]; // All images
     userId?: string;
+    status?: 'OPEN' | 'CLAIMED' | 'RESOLVED';
 }
 
 export interface Complaint {
@@ -27,9 +27,12 @@ export interface Complaint {
     description: string;
     contactInfo: string;
     imageUris?: string[];
-    status: string;
+    status: 'OPEN' | 'CLOSED' | 'RESOLVED';
     createdAt: string;
     userId?: string;
+    closureReason?: string;
+    reopenReason?: string;
+    resolvedAt?: string;
 }
 
 // ============= Item API =============
@@ -95,6 +98,21 @@ export const getItemById = async (id: string): Promise<Item | null> => {
     }
 };
 
+export const updateItemStatus = async (id: string, status: string): Promise<Item | null> => {
+    try {
+        const response = await fetch(`${API_URL}/items/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status }),
+        });
+        if (!response.ok) throw new Error('Failed to update item status');
+        return await response.json();
+    } catch (error) {
+        console.error('Error updating item status:', error);
+        return null;
+    }
+};
+
 // ============= Complaint API =============
 
 export const addComplaint = async (complaint: Omit<Complaint, 'id' | 'createdAt' | 'status'>) => {
@@ -144,5 +162,36 @@ export const getComplaintById = async (id: string): Promise<Complaint | null> =>
     } catch (error) {
         console.error('Error fetching complaint:', error);
         return null;
+    }
+};
+
+export const updateComplaintStatus = async (id: string, status: string, reason?: string): Promise<Complaint | null> => {
+    try {
+        const body: any = { status };
+        if (status === 'CLOSED') body.closureReason = reason;
+        if (status === 'OPEN') body.reopenReason = reason;
+        if (status === 'RESOLVED') body.resolvedAt = new Date().toISOString();
+
+        const response = await fetch(`${API_URL}/complaints/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error('Failed to update complaint status');
+        return await response.json();
+    } catch (error) {
+        console.error('Error updating complaint status:', error);
+        return null;
+    }
+};
+
+export const getClosedComplaints = async (): Promise<Complaint[]> => {
+    try {
+        const response = await fetch(`${API_URL}/complaints?status=CLOSED&status=RESOLVED`);
+        if (!response.ok) throw new Error('Failed to fetch closed complaints');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching closed complaints:', error);
+        return [];
     }
 };

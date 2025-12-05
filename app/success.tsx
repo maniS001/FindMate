@@ -1,9 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle } from 'lucide-react-native';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import { useTheme } from '../contexts/ThemeContext';
+import { updateItemStatus } from '../store';
 
 export default function Success() {
     const router = useRouter();
@@ -12,7 +14,9 @@ export default function Success() {
         type: string;
         message: string;
         contactInfo?: string;
+        itemId?: string; // Added itemId to params
     }>();
+    const [updating, setUpdating] = useState(false);
 
     const getTitle = () => {
         switch (params.type) {
@@ -46,6 +50,23 @@ export default function Success() {
         }
     };
 
+    const handleConfirmRecovery = async () => {
+        if (!params.itemId) return;
+
+        setUpdating(true);
+        try {
+            // Mark item as CLAIMED (or RESOLVED depending on logic, but CLAIMED fits 'got it')
+            await updateItemStatus(params.itemId, 'CLAIMED');
+            Alert.alert('Great!', 'We are happy you found your item. The item status has been updated.', [
+                { text: 'OK', onPress: () => router.push('/') }
+            ]);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to update item status.');
+        } finally {
+            setUpdating(false);
+        }
+    };
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
             <View style={styles.content}>
@@ -71,11 +92,28 @@ export default function Success() {
                     </View>
                 )}
 
+                {/* Recovery Confirmation Section */}
+                {params.contactInfo && params.itemId && (
+                    <View style={[styles.recoverySection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Text style={[styles.recoveryTitle, { color: colors.text }]}>Did you recover your item?</Text>
+                        <Text style={[styles.recoveryText, { color: colors.textSecondary }]}>
+                            If you have successfully collected your item from the founder, please let us know.
+                        </Text>
+                        <Button
+                            title="Yes, I got it!"
+                            onPress={handleConfirmRecovery}
+                            loading={updating}
+                            style={{ marginTop: 12, backgroundColor: '#10B981' }}
+                        />
+                    </View>
+                )}
+
                 <View style={styles.buttonContainer}>
                     <Button
                         title="Go to Home"
                         onPress={() => router.push('/')}
                         style={{ marginBottom: 12 }}
+                        variant="outline"
                     />
                     <Button
                         title="Go Back"
@@ -118,7 +156,7 @@ const styles = StyleSheet.create({
         padding: 20,
         borderRadius: 12,
         borderWidth: 1,
-        marginBottom: 32,
+        marginBottom: 24,
         width: '100%',
         maxWidth: 400,
     },
@@ -129,6 +167,25 @@ const styles = StyleSheet.create({
     contactInfo: {
         fontSize: 20,
         fontWeight: '600',
+    },
+    recoverySection: {
+        padding: 20,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginBottom: 32,
+        width: '100%',
+        maxWidth: 400,
+        alignItems: 'center',
+    },
+    recoveryTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 8,
+    },
+    recoveryText: {
+        fontSize: 14,
+        textAlign: 'center',
+        marginBottom: 12,
     },
     buttonContainer: {
         width: '100%',

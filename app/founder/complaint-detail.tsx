@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Complaint, getComplaintById } from '../../store';
+import { Complaint, getComplaintById, updateComplaintStatus } from '../../store';
 
 const { width } = Dimensions.get('window');
 const IMAGE_WIDTH = width - 48; // 24px padding on each side
@@ -17,6 +17,7 @@ export default function ComplaintDetail() {
     const router = useRouter();
     const [complaint, setComplaint] = useState<Complaint | null>(null);
     const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
 
     useEffect(() => {
         const fetchComplaint = async () => {
@@ -36,6 +37,34 @@ export default function ComplaintDetail() {
         Linking.openURL(`tel:${phone}`).catch(() => {
             Alert.alert('Error', 'Unable to make a call');
         });
+    };
+
+    const handleMarkReturned = async () => {
+        if (!complaint) return;
+
+        Alert.alert(
+            'Confirm Return',
+            'Are you sure you want to mark this item as returned to the owner?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Yes, Returned',
+                    onPress: async () => {
+                        setActionLoading(true);
+                        try {
+                            await updateComplaintStatus(complaint.id, 'RESOLVED');
+                            Alert.alert('Success', 'Complaint marked as resolved!', [
+                                { text: 'OK', onPress: () => router.back() }
+                            ]);
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to update status.');
+                        } finally {
+                            setActionLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     if (loading) {
@@ -70,6 +99,8 @@ export default function ComplaintDetail() {
             images = [complaint.imageUris];
         }
     }
+
+    const isResolved = complaint.status === 'RESOLVED' || complaint.status === 'CLOSED';
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
@@ -106,8 +137,13 @@ export default function ComplaintDetail() {
 
                     <View style={styles.header}>
                         <Text style={[styles.itemName, { color: colors.text }]}>{complaint.name}</Text>
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>Lost Item</Text>
+                        <View style={[
+                            styles.badge,
+                            { backgroundColor: isResolved ? '#10B981' : '#EF4444' }
+                        ]}>
+                            <Text style={styles.badgeText}>
+                                {isResolved ? 'Resolved' : 'Lost Item'}
+                            </Text>
                         </View>
                     </View>
 
@@ -154,11 +190,22 @@ export default function ComplaintDetail() {
                     )}
                 </Card>
 
-                <Button
-                    title="Call Owner"
-                    onPress={handleCall}
-                    style={{ marginTop: 16 }}
-                />
+                <View style={styles.actions}>
+                    <Button
+                        title="Call Owner"
+                        onPress={handleCall}
+                        style={{ flex: 1 }}
+                        variant="secondary"
+                    />
+                    {!isResolved && (
+                        <Button
+                            title="Mark as Returned"
+                            onPress={handleMarkReturned}
+                            loading={actionLoading}
+                            style={{ flex: 1, backgroundColor: '#10B981' }}
+                        />
+                    )}
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -214,7 +261,6 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     badge: {
-        backgroundColor: '#EF4444',
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 16,
@@ -265,5 +311,10 @@ const styles = StyleSheet.create({
     description: {
         fontSize: 16,
         lineHeight: 24,
+    },
+    actions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 16,
     },
 });

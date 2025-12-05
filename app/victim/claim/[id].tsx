@@ -107,7 +107,8 @@ export default function ClaimItem() {
             pathname: '/success',
             params: {
                 type: 'payment',
-                contactInfo: item.contactInfo
+                contactInfo: item?.contactInfo,
+                itemId: item?.id // Pass item ID for status update
             }
         });
     };

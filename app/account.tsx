@@ -1,11 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ArrowLeft, FileText, LogOut, Package } from 'lucide-react-native';
+import { ArrowLeft, FileText, LogOut, Package, RefreshCw, XCircle } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ReasonModal from '../components/ReasonModal';
 import { API_URL } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { updateComplaintStatus } from '../store';
 
 export default function AccountScreen() {
     const router = useRouter();
@@ -13,6 +15,13 @@ export default function AccountScreen() {
     const { user, logout, token } = useAuth();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLOSED'>('ACTIVE');
+
+    // Modal State
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalType, setModalType] = useState<'CLOSE' | 'REOPEN'>('CLOSE');
+    const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
+    const [actionLoading, setActionLoading] = useState(false);
 
     useFocusEffect(
         useCallback(() => {
@@ -53,6 +62,31 @@ export default function AccountScreen() {
         );
     };
 
+    const handleAction = (id: string, type: 'CLOSE' | 'REOPEN') => {
+        setSelectedComplaintId(id);
+        setModalType(type);
+        setModalVisible(true);
+    };
+
+    const handleSubmitReason = async (reason: string) => {
+        if (!selectedComplaintId) return;
+
+        setActionLoading(true);
+        try {
+            const newStatus = modalType === 'CLOSE' ? 'CLOSED' : 'OPEN';
+            await updateComplaintStatus(selectedComplaintId, newStatus, reason);
+
+            // Refresh profile to show updates
+            await fetchProfile();
+            setModalVisible(false);
+            Alert.alert('Success', `Complaint ${modalType === 'CLOSE' ? 'closed' : 'reopened'} successfully.`);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to update complaint status.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     if (loading) {
         return (
             <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
@@ -61,8 +95,54 @@ export default function AccountScreen() {
         );
     }
 
+    const activeComplaints = profile?.complaints?.filter((c: any) => c.status !== 'CLOSED' && c.status !== 'RESOLVED') || [];
+    const closedComplaints = profile?.complaints?.filter((c: any) => c.status === 'CLOSED' || c.status === 'RESOLVED') || [];
+
+    const renderComplaintItem = (complaint: any, isClosed: boolean) => (
+        <View key={complaint.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.historyIcon}>
+                <FileText size={20} color={isClosed ? colors.success : colors.error} />
+            </View>
+            <View style={styles.historyContent}>
+                <Text style={[styles.historyTitle, { color: colors.text }]}>{complaint.name}</Text>
+                <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{complaint.date}</Text>
+                {isClosed && complaint.closureReason && (
+                    <Text style={[styles.reasonText, { color: colors.textSecondary }]}>Reason: {complaint.closureReason}</Text>
+                )}
+            </View>
+
+            <TouchableOpacity
+                style={[
+                    styles.actionButton,
+                    { backgroundColor: isClosed ? colors.primary + '10' : colors.error + '10' }
+                ]}
+                onPress={() => handleAction(complaint.id, isClosed ? 'REOPEN' : 'CLOSE')}
+            >
+                {isClosed ? (
+                    <RefreshCw size={16} color={colors.primary} />
+                ) : (
+                    <XCircle size={16} color={colors.error} />
+                )}
+                <Text style={[
+                    styles.actionText,
+                    { color: isClosed ? colors.primary : colors.error }
+                ]}>
+                    {isClosed ? 'Raise Again' : 'Close'}
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <ReasonModal
+                visible={modalVisible}
+                type={modalType}
+                onClose={() => setModalVisible(false)}
+                onSubmit={handleSubmitReason}
+                loading={actionLoading}
+            />
+
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <ArrowLeft size={24} color={colors.text} />
@@ -107,13 +187,60 @@ export default function AccountScreen() {
                     </View>
                 </View>
 
-                {/* History Section */}
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+                {/* Complaints Section */}
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>My Complaints</Text>
 
-                {profile?.items?.length === 0 && profile?.complaints?.length === 0 ? (
+                <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
+                    <TouchableOpacity
+                        style={[styles.tab, activeTab === 'ACTIVE' && { borderBottomColor: colors.primary }]}
+                        onPress={() => setActiveTab('ACTIVE')}
+                    >
+                        <Text style={[
+                            styles.tabText,
+                            { color: activeTab === 'ACTIVE' ? colors.primary : colors.textSecondary }
+                        ]}>Active ({activeComplaints.length})</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.tab, activeTab === 'CLOSED' && { borderBottomColor: colors.primary }]}
+                        onPress={() => setActiveTab('CLOSED')}
+                    >
+                        <Text style={[
+                            styles.tabText,
+                            { color: activeTab === 'CLOSED' ? colors.primary : colors.textSecondary }
+                        ]}>Closed ({closedComplaints.length})</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.historyList}>
+                    {activeTab === 'ACTIVE' ? (
+                        activeComplaints.length > 0 ? (
+                            activeComplaints.map((c: any) => renderComplaintItem(c, false))
+                        ) : (
+                            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                    No active complaints.
+                                </Text>
+                            </View>
+                        )
+                    ) : (
+                        closedComplaints.length > 0 ? (
+                            closedComplaints.map((c: any) => renderComplaintItem(c, true))
+                        ) : (
+                            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                    No closed complaints.
+                                </Text>
+                            </View>
+                        )
+                    )}
+                </View>
+
+                {/* Reported Items Section */}
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Reported Items</Text>
+                {profile?.items?.length === 0 ? (
                     <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                            No activity yet. Start by reporting an item or filing a complaint.
+                            No items reported yet.
                         </Text>
                     </View>
                 ) : (
@@ -124,26 +251,11 @@ export default function AccountScreen() {
                                     <Package size={20} color={colors.primary} />
                                 </View>
                                 <View style={styles.historyContent}>
-                                    <Text style={[styles.historyTitle, { color: colors.text }]}>Reported: {item.name}</Text>
+                                    <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
                                     <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
                                 </View>
                                 <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                                    <Text style={[styles.badgeText, { color: colors.primary }]}>Item</Text>
-                                </View>
-                            </View>
-                        ))}
-
-                        {profile?.complaints?.map((complaint: any) => (
-                            <View key={complaint.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                                <View style={styles.historyIcon}>
-                                    <FileText size={20} color={colors.error} />
-                                </View>
-                                <View style={styles.historyContent}>
-                                    <Text style={[styles.historyTitle, { color: colors.text }]}>Filed: {complaint.name}</Text>
-                                    <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{complaint.date}</Text>
-                                </View>
-                                <View style={[styles.badge, { backgroundColor: colors.error + '20' }]}>
-                                    <Text style={[styles.badgeText, { color: colors.error }]}>Complaint</Text>
+                                    <Text style={[styles.badgeText, { color: colors.primary }]}>{item.status || 'OPEN'}</Text>
                                 </View>
                             </View>
                         ))}
@@ -283,5 +395,38 @@ const styles = StyleSheet.create({
     badgeText: {
         fontSize: 10,
         fontWeight: 'bold',
+    },
+    tabs: {
+        flexDirection: 'row',
+        borderBottomWidth: 1,
+        marginBottom: 8,
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderBottomWidth: 2,
+        borderBottomColor: 'transparent',
+    },
+    tabText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    actionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    actionText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    reasonText: {
+        fontSize: 11,
+        fontStyle: 'italic',
+        marginTop: 2,
     },
 });

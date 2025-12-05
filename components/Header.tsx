@@ -19,13 +19,16 @@ export default function Header() {
 
     const menuItems: MenuItem[] = [
         { icon: <User size={20} color={colors.text} />, label: 'Account Details', route: '/account' },
+        { icon: <Bell size={20} color={colors.text} />, label: 'Notifications', route: '/notifications' },
         { icon: <Settings size={20} color={colors.text} />, label: 'Settings', route: '/settings' },
         { icon: <Info size={20} color={colors.text} />, label: 'About Us', route: '/about' },
     ];
 
     const handleMenuItemPress = (route: string) => {
         setMenuVisible(false);
-        router.push(route as never);
+        if (pathname !== route) {
+            router.push(route as never);
+        }
     };
 
     return (
@@ -34,7 +37,11 @@ export default function Header() {
                 <View style={styles.leftSection}>
                     {pathname === '/' && (
                         <TouchableOpacity
-                            onPress={() => router.push('/account' as never)}
+                            onPress={() => {
+                                if (pathname !== '/account') {
+                                    router.push('/account' as never);
+                                }
+                            }}
                             style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
                             activeOpacity={0.7}
                         >
@@ -44,7 +51,7 @@ export default function Header() {
 
                     {pathname !== '/' && (
                         <>
-                            {pathname !== '/' && pathname !== '/account' && pathname !== '/settings' && pathname !== '/about' && (
+                            {pathname !== '/' && pathname !== '/account' && pathname !== '/settings' && pathname !== '/about' && pathname !== '/notifications' && (
                                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                                     <ArrowLeft size={24} color={colors.headerText} />
                                 </TouchableOpacity>
@@ -60,22 +67,17 @@ export default function Header() {
                     {/* User Icon (on right for non-home pages) */}
                     {pathname !== '/' && (
                         <TouchableOpacity
-                            onPress={() => router.push('/account' as never)}
+                            onPress={() => {
+                                if (pathname !== '/account') {
+                                    router.push('/account' as never);
+                                }
+                            }}
                             style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
                             activeOpacity={0.7}
                         >
                             <User size={20} color={colors.headerText} />
                         </TouchableOpacity>
                     )}
-
-                    {/* Notifications */}
-                    <TouchableOpacity
-                        onPress={() => router.push('/notifications' as never)}
-                        style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
-                        activeOpacity={0.7}
-                    >
-                        <Bell size={20} color={colors.headerText} />
-                    </TouchableOpacity>
 
                     {/* Theme Toggle */}
                     <TouchableOpacity
