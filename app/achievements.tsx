@@ -5,12 +5,12 @@ import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../components/Card';
 import { useTheme } from '../contexts/ThemeContext';
-import { Complaint, getClosedComplaints } from '../store';
+import { Complaint, getClosedComplaints, getRecoveredItems, Item } from '../store';
 
 export default function AchievementsScreen() {
     const router = useRouter();
     const { colors } = useTheme();
-    const [complaints, setComplaints] = useState<Complaint[]>([]);
+    const [items, setItems] = useState<(Complaint | Item)[]>([]);
     const [loading, setLoading] = useState(true);
 
     useFocusEffect(
@@ -21,8 +21,19 @@ export default function AchievementsScreen() {
 
     const fetchAchievements = async () => {
         try {
-            const data = await getClosedComplaints();
-            setComplaints(data);
+            const [complaintsData, recoveredItems] = await Promise.all([
+                getClosedComplaints(),
+                getRecoveredItems()
+            ]);
+
+            // Normalize and merge (simplistic approach, just concat)
+            const combined = [...complaintsData, ...recoveredItems].sort((a, b) => {
+                const dateA = new Date((a as any).resolvedAt || (a as any).recoveredAt || a.date).getTime();
+                const dateB = new Date((b as any).resolvedAt || (b as any).recoveredAt || b.date).getTime();
+                return dateB - dateA;
+            });
+
+            setItems(combined);
         } catch (error) {
             console.error('Failed to fetch achievements', error);
         } finally {
@@ -30,7 +41,7 @@ export default function AchievementsScreen() {
         }
     };
 
-    const renderItem = ({ item }: { item: Complaint }) => {
+    const renderItem = ({ item }: { item: Complaint | Item }) => {
         let imageUri = null;
         if (item.imageUris) {
             try {
@@ -77,11 +88,14 @@ export default function AchievementsScreen() {
                     </View>
                 </View>
 
-                {item.closureReason && (
-                    <View style={[styles.reasonContainer, { backgroundColor: colors.background }]}>
-                        <Text style={[styles.reasonLabel, { color: colors.textSecondary }]}>Story:</Text>
+                )}
+
+                {/* Show Feedback if available (for recovered items) */}
+                {'feedbackComment' in item && item.feedbackComment && (
+                    <View style={[styles.reasonContainer, { backgroundColor: colors.background, marginTop: 8 }]}>
+                        <Text style={[styles.reasonLabel, { color: colors.textSecondary }]}>Victim Feedback:</Text>
                         <Text style={[styles.reasonText, { color: colors.text }]} numberOfLines={2}>
-                            {item.closureReason}
+                            "{item.feedbackComment}"
                         </Text>
                     </View>
                 )}
@@ -105,14 +119,14 @@ export default function AchievementsScreen() {
                 </View>
             ) : (
                 <FlatList
-                    data={complaints}
+                    data={items}
                     renderItem={renderItem}
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={styles.list}
                     ListHeaderComponent={
                         <View style={styles.listHeader}>
                             <Text style={[styles.statsText, { color: colors.textSecondary }]}>
-                                {complaints.length} items recovered and returned to their owners!
+                                {items.length} items recovered and returned to their owners!
                             </Text>
                         </View>
                     }

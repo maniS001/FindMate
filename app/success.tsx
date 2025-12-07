@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { Complaint, getComplaints, updateComplaintStatus, updateItemStatus } from '../store';
+import { claimItem, Complaint, getComplaints, updateComplaintStatus, updateItemStatus } from '../store';
 
 export default function Success() {
     const router = useRouter();
@@ -85,7 +85,11 @@ export default function Success() {
         setUpdating(true);
         try {
             // 1. Update Item Status
-            await updateItemStatus(params.itemId, 'CLAIMED');
+            if (user?.id) {
+                await claimItem(params.itemId, user.id);
+            } else {
+                await updateItemStatus(params.itemId, 'CLAIMED'); // Fallback if no user check
+            }
 
             // 2. Check if there are open complaints to close
             if (userComplaints.length > 0) {

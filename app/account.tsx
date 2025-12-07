@@ -1,13 +1,14 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ArrowLeft, FileText, LogOut, Package, RefreshCw, XCircle } from 'lucide-react-native';
+import { ArrowLeft, FileText, LogOut, Package, RefreshCw, Star, XCircle } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import FeedbackModal from '../components/FeedbackModal';
 import ReasonModal from '../components/ReasonModal';
 import { API_URL } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { updateComplaintStatus } from '../store';
+import { getClaimedItems, recoverItem, updateComplaintStatus } from '../store';
 
 export default function AccountScreen() {
     const router = useRouter();
@@ -15,13 +16,18 @@ export default function AccountScreen() {
     const { user, logout, token } = useAuth();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLOSED'>('ACTIVE');
+    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLOSED' | 'CLAIMED'>('ACTIVE');
 
     // Modal State
     const [modalVisible, setModalVisible] = useState(false);
     const [modalType, setModalType] = useState<'CLOSE' | 'REOPEN'>('CLOSE');
     const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
+
+    // Claimed Items
+    const [claimedItems, setClaimedItems] = useState<any[]>([]);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
     useFocusEffect(
         useCallback(() => {
@@ -37,6 +43,11 @@ export default function AccountScreen() {
             const data = await response.json();
             if (response.ok) {
                 setProfile(data);
+                // Fetch claimed items
+                if (data.id) {
+                    const claimed = await getClaimedItems(data.id);
+                    setClaimedItems(claimed);
+                }
             }
         } catch (error) {
             console.error('Failed to fetch profile', error);
@@ -82,6 +93,27 @@ export default function AccountScreen() {
             Alert.alert('Success', `Complaint ${modalType === 'CLOSE' ? 'closed' : 'reopened'} successfully.`);
         } catch (error) {
             Alert.alert('Error', 'Failed to update complaint status.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleMarkRecovered = (itemId: string) => {
+        setSelectedItemId(itemId);
+        setShowFeedbackModal(true);
+    };
+
+    const handleSubmitFeedback = async (rating: number, comment: string) => {
+        if (!selectedItemId) return;
+
+        setActionLoading(true);
+        try {
+            await recoverItem(selectedItemId, { rating, comment });
+            await fetchProfile(); // Refresh claimed list status
+            setShowFeedbackModal(false);
+            Alert.alert('Success', 'Item marked as recovered and feedback submitted!');
+        } catch (error) {
+            Alert.alert('Error', 'Failed to mark item as recovered.');
         } finally {
             setActionLoading(false);
         }
@@ -133,6 +165,34 @@ export default function AccountScreen() {
         </View>
     );
 
+    const renderClaimedItem = (item: any) => (
+        <View key={item.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.historyIcon}>
+                <Package size={20} color={colors.primary} />
+            </View>
+            <View style={styles.historyContent}>
+                <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
+                <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                {item.status === 'RECOVERED' && (
+                    <Text style={[styles.reasonText, { color: colors.success }]}>Recovered</Text>
+                )}
+            </View>
+
+            {item.status === 'CLAIMED' ? (
+                <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                    onPress={() => handleMarkRecovered(item.id)}
+                >
+                    <Text style={[styles.actionText, { color: 'white' }]}>Mark Recovered</Text>
+                </TouchableOpacity>
+            ) : (
+                <View style={[styles.badge, { backgroundColor: colors.success + '20' }]}>
+                    <Text style={[styles.badgeText, { color: colors.success }]}>RECOVERED</Text>
+                </View>
+            )}
+        </View>
+    );
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             <ReasonModal
@@ -140,6 +200,12 @@ export default function AccountScreen() {
                 type={modalType}
                 onClose={() => setModalVisible(false)}
                 onSubmit={handleSubmitReason}
+                loading={actionLoading}
+            />
+            <FeedbackModal
+                visible={showFeedbackModal}
+                onClose={() => setShowFeedbackModal(false)}
+                onSubmit={handleSubmitFeedback}
                 loading={actionLoading}
             />
 
@@ -209,6 +275,15 @@ export default function AccountScreen() {
                             { color: activeTab === 'CLOSED' ? colors.primary : colors.textSecondary }
                         ]}>Closed ({closedComplaints.length})</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.tab, activeTab === 'CLAIMED' && { borderBottomColor: colors.primary }]}
+                        onPress={() => setActiveTab('CLAIMED')}
+                    >
+                        <Text style={[
+                            styles.tabText,
+                            { color: activeTab === 'CLAIMED' ? colors.primary : colors.textSecondary }
+                        ]}>Claimed ({claimedItems.length})</Text>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.historyList}>
@@ -222,13 +297,23 @@ export default function AccountScreen() {
                                 </Text>
                             </View>
                         )
-                    ) : (
+                    ) : activeTab === 'CLOSED' ? (
                         closedComplaints.length > 0 ? (
                             closedComplaints.map((c: any) => renderComplaintItem(c, true))
                         ) : (
                             <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                                     No closed complaints.
+                                </Text>
+                            </View>
+                        )
+                    ) : (
+                        claimedItems.length > 0 ? (
+                            claimedItems.map((item: any) => renderClaimedItem(item))
+                        ) : (
+                            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                    No claimed items.
                                 </Text>
                             </View>
                         )
@@ -253,6 +338,18 @@ export default function AccountScreen() {
                                 <View style={styles.historyContent}>
                                     <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
                                     <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                                    {item.status === 'RECOVERED' && item.feedbackRating && (
+                                        <View style={{ marginTop: 4 }}>
+                                            <View style={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+                                                {[...Array(item.feedbackRating)].map((_, i) => (
+                                                    <Star key={i} size={12} color="#F59E0B" fill="#F59E0B" />
+                                                ))}
+                                            </View>
+                                            {item.feedbackComment && (
+                                                <Text style={[styles.reasonText, { color: colors.textSecondary }]}>"{item.feedbackComment}"</Text>
+                                            )}
+                                        </View>
+                                    )}
                                 </View>
                                 <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
                                     <Text style={[styles.badgeText, { color: colors.primary }]}>{item.status || 'OPEN'}</Text>

@@ -15,7 +15,11 @@ export interface Item {
     imageUri?: string; // Main image for backward compatibility/preview
     imageUris?: string[]; // All images
     userId?: string;
-    status?: 'OPEN' | 'CLAIMED' | 'RESOLVED';
+    status?: 'OPEN' | 'CLAIMED' | 'RESOLVED' | 'RECOVERED';
+    claimedByUserId?: string;
+    recoveredAt?: string;
+    feedbackRating?: number;
+    feedbackComment?: string;
 }
 
 export interface Complaint {
@@ -78,11 +82,22 @@ export const getItems = async (): Promise<Item[]> => {
 
 export const searchItems = async (query: string): Promise<Item[]> => {
     try {
-        const response = await fetch(`${API_URL}/items?query=${encodeURIComponent(query)}`);
+        const response = await fetch(`${API_URL}/items?query=${encodeURIComponent(query)}&excludeClaimed=true`);
         if (!response.ok) throw new Error('Failed to search items');
         return await response.json();
     } catch (error) {
         console.error('Error searching items:', error);
+        return [];
+    }
+};
+
+export const getClaimedItems = async (userId: string): Promise<Item[]> => {
+    try {
+        const response = await fetch(`${API_URL}/items?claimedBy=${userId}`);
+        if (!response.ok) throw new Error('Failed to fetch claimed items');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching claimed items:', error);
         return [];
     }
 };
@@ -110,6 +125,51 @@ export const updateItemStatus = async (id: string, status: string): Promise<Item
     } catch (error) {
         console.error('Error updating item status:', error);
         return null;
+    }
+};
+
+export const claimItem = async (id: string, userId: string): Promise<Item | null> => {
+    try {
+        const response = await fetch(`${API_URL}/items/${id}/claim`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+        });
+        if (!response.ok) throw new Error('Failed to claim item');
+        return await response.json();
+    } catch (error) {
+        console.error('Error claiming item:', error);
+        return null;
+    }
+};
+
+export const recoverItem = async (id: string, feedback: { rating: number; comment: string }): Promise<Item | null> => {
+    try {
+        const response = await fetch(`${API_URL}/items/${id}/recover`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                feedbackRating: feedback.rating,
+                feedbackComment: feedback.comment,
+            }),
+        });
+        if (!response.ok) throw new Error('Failed to recover item');
+        return await response.json();
+    } catch (error) {
+        console.error('Error recovering item:', error);
+        return null;
+    }
+};
+
+export const getRecoveredItems = async (): Promise<Item[]> => {
+    try {
+        const response = await fetch(`${API_URL}/items?excludeClaimed=false`); // Get all items
+        if (!response.ok) throw new Error('Failed to fetch items');
+        const items: Item[] = await response.json();
+        return items.filter(item => item.status === 'RECOVERED');
+    } catch (error) {
+        console.error('Error fetching recovered items:', error);
+        return [];
     }
 };
 

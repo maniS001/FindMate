@@ -210,16 +210,24 @@ app.post('/api/complaints', async (req, res) => {
 // List Items (with search)
 app.get('/api/items', async (req, res) => {
     try {
-        const { query } = req.query;
-        const where = query
-            ? {
-                OR: [
-                    { name: { contains: String(query), mode: 'insensitive' as const } },
-                    { category: { contains: String(query), mode: 'insensitive' as const } },
-                    { location: { contains: String(query), mode: 'insensitive' as const } },
-                ],
-            }
-            : {};
+        const { query, claimedBy, excludeClaimed } = req.query;
+        let where: any = {};
+
+        if (query) {
+            where.OR = [
+                { name: { contains: String(query), mode: 'insensitive' as const } },
+                { category: { contains: String(query), mode: 'insensitive' as const } },
+                { location: { contains: String(query), mode: 'insensitive' as const } },
+            ];
+        }
+
+        if (claimedBy) {
+            where.claimedByUserId = String(claimedBy);
+        }
+
+        if (excludeClaimed === 'true') {
+            where.status = 'OPEN';
+        }
 
         const items = await prisma.item.findMany({
             where,
@@ -330,6 +338,54 @@ app.patch('/api/complaints/:id', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to update complaint status' });
+    }
+});
+
+// Claim Item
+app.post('/api/items/:id/claim', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { userId } = req.body;
+
+        const item = await prisma.item.update({
+            where: { id },
+            data: {
+                status: 'CLAIMED',
+                claimedByUserId: userId,
+            },
+        });
+        res.json(item);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to claim item' });
+    }
+});
+
+// Recover Item (with feedback)
+app.post('/api/items/:id/recover', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { feedbackRating, feedbackComment } = req.body;
+
+        console.log('Recovering item:', id, req.body);
+        const item = await prisma.item.update({
+            where: { id },
+            data: {
+                status: 'RECOVERED',
+                recoveredAt: new Date(),
+                feedbackRating,
+                feedbackComment,
+            },
+        });
+        console.log('Item recovered:', item);
+        res.json(item);
+    } catch (error: any) {
+        console.error('Error in recover endpoint:', error);
+        res.status(500).json({
+            error: 'Failed to recover item',
+            details: error.message || String(error),
+            meta: error.meta // Prisma specific
+        });
     }
 });
 

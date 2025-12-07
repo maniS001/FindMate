@@ -31,7 +31,11 @@ model Item {
   contactInfo String
   imageUris   String[]
   questions   Question[]
-  status      String     @default("OPEN") // Added status
+  status          String     @default("OPEN") // Added status
+  claimedByUserId String?
+  recoveredAt     DateTime?
+  feedbackRating  Int?
+  feedbackComment String?
   createdAt   DateTime   @default(now())
   
   userId      String?
