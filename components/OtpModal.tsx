@@ -22,10 +22,6 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
     const [message, setMessage] = useState<string | null>(null);
 
     useEffect(() => {
-        setMessage(null);
-    }, [step]);
-
-    useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
         if (timer > 0) {
             interval = setInterval(() => {
@@ -54,11 +50,14 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
             setStep('otp');
             setTimer(60);
 
-            if (data.debugCode) {
-                setMessage(`OTP Sent! Code: ${data.debugCode}`);
-            } else {
-                setMessage('OTP sent to your phone.');
-            }
+            // Show OTP message
+            setTimeout(() => {
+                if (data.debugCode) {
+                    setMessage(`OTP Sent! Code: ${data.debugCode}`);
+                } else {
+                    setMessage('OTP sent to your phone.');
+                }
+            }, 100);
         } catch (error: any) {
             setMessage(error.message);
         } finally {

@@ -39,6 +39,18 @@ export interface Complaint {
     resolvedAt?: string;
 }
 
+export interface Notification {
+    id: string;
+    userId: string;
+    title: string;
+    message: string;
+    type: 'CLAIM_REQUEST' | 'ITEM_FOUND' | 'SYSTEM';
+    payload?: string;
+    read: boolean;
+    createdAt: string;
+}
+
+
 // ============= Item API =============
 
 export const addItem = async (item: Omit<Item, 'id' | 'createdAt'> | FormData) => {
@@ -270,3 +282,21 @@ export const getClosedComplaints = async (): Promise<Complaint[]> => {
         return [];
     }
 };
+
+// ============= Notification API =============
+
+export const getNotifications = async (token: string): Promise<Notification[]> => {
+    try {
+        const response = await fetch(`${API_URL}/notifications`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        if (!response.ok) throw new Error('Failed to fetch notifications');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching notifications:', error);
+        return [];
+    }
+};
+
