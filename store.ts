@@ -31,7 +31,7 @@ export interface Complaint {
     description: string;
     contactInfo: string;
     imageUris?: string[];
-    status: 'OPEN' | 'CLOSED' | 'RESOLVED';
+    status: 'OPEN' | 'CLOSED' | 'RESOLVED' | 'NOTIFIED';
     createdAt: string;
     userId?: string;
     closureReason?: string;
@@ -268,6 +268,21 @@ export const updateComplaintStatus = async (id: string, status: string, reason?:
         return await response.json();
     } catch (error) {
         console.error('Error updating complaint status:', error);
+        return null;
+    }
+};
+
+export const updateComplaint = async (id: string, data: Partial<Complaint>): Promise<Complaint | null> => {
+    try {
+        const response = await fetch(`${API_URL}/complaints/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error('Failed to update complaint');
+        return await response.json();
+    } catch (error) {
+        console.error('Error updating complaint:', error);
         return null;
     }
 };

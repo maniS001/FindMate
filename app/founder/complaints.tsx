@@ -83,8 +83,16 @@ export default function ViewComplaints() {
 
                     <View style={styles.itemHeader}>
                         <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>Lost</Text>
+                        <View style={[
+                            styles.badge,
+                            item.status === 'NOTIFIED' && { backgroundColor: colors.primary + '20' }
+                        ]}>
+                            <Text style={[
+                                styles.badgeText,
+                                item.status === 'NOTIFIED' && { color: colors.primary }
+                            ]}>
+                                {item.status === 'NOTIFIED' ? 'Notified' : 'Lost'}
+                            </Text>
                         </View>
                     </View>
 

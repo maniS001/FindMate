@@ -7,7 +7,7 @@ import Button from '../../components/Button';
 import Card from '../../components/Card';
 import NotifyOwnerModal from '../../components/NotifyOwnerModal';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Complaint, getComplaintById, notifyOwner } from '../../store';
+import { Complaint, getComplaintById, notifyOwner, updateComplaintStatus } from '../../store';
 
 const { width } = Dimensions.get('window');
 const IMAGE_WIDTH = width - 48; // 24px padding on each side
@@ -38,8 +38,13 @@ export default function ComplaintDetail() {
         setNotifyLoading(true);
         try {
             await notifyOwner(complaint.id, data);
+
+            // Update complaint status to NOTIFIED locally and on backend
+            await updateComplaintStatus(complaint.id, 'NOTIFIED');
+
             setNotifyModalVisible(false);
             Alert.alert('Success', 'Owner has been notified securely!');
+            router.back(); // Go back to list to see updated status
         } catch (error) {
             Alert.alert('Error', 'Failed to notify owner.');
         } finally {

@@ -323,12 +323,22 @@ app.patch('/api/items/:id', async (req, res) => {
 app.patch('/api/complaints/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, closureReason, reopenReason, resolvedAt } = req.body;
+        const { status, closureReason, reopenReason, resolvedAt, name, category, location, date, description, contactInfo, imageUris } = req.body;
 
-        const data: any = { status };
+        const data: any = {};
+        if (status) data.status = status;
         if (closureReason) data.closureReason = closureReason;
         if (reopenReason) data.reopenReason = reopenReason;
         if (resolvedAt) data.resolvedAt = resolvedAt;
+
+        // Allow updating content fields
+        if (name) data.name = name;
+        if (category) data.category = category;
+        if (location) data.location = location;
+        if (date) data.date = date;
+        if (description) data.description = description;
+        if (contactInfo) data.contactInfo = contactInfo;
+        if (imageUris) data.imageUris = typeof imageUris === 'string' ? imageUris : JSON.stringify(imageUris);
 
         const complaint = await prisma.complaint.update({
             where: { id },
@@ -337,7 +347,7 @@ app.patch('/api/complaints/:id', async (req, res) => {
         res.json(complaint);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Failed to update complaint status' });
+        res.status(500).json({ error: 'Failed to update complaint' });
     }
 });
 

@@ -1,14 +1,15 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ArrowLeft, FileText, LogOut, Package, RefreshCw, Star, XCircle } from 'lucide-react-native';
+import { ArrowLeft, Bell, FileText, LogOut, Package, RefreshCw, Star, XCircle } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ConfirmModal from '../components/ConfirmModal';
 import FeedbackModal from '../components/FeedbackModal';
 import ReasonModal from '../components/ReasonModal';
 import { API_URL } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { getClaimedItems, recoverItem, updateComplaintStatus } from '../store';
+import { getClaimedItems, getNotifications, Notification, recoverItem, updateComplaintStatus } from '../store';
 
 export default function AccountScreen() {
     const router = useRouter();
@@ -16,7 +17,7 @@ export default function AccountScreen() {
     const { user, logout, token } = useAuth();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLOSED' | 'CLAIMED'>('ACTIVE');
+    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLOSED' | 'CLAIMED' | 'NOTIFIED'>('ACTIVE');
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
     // Modal State
@@ -27,6 +28,9 @@ export default function AccountScreen() {
 
     // Claimed Items
     const [claimedItems, setClaimedItems] = useState<any[]>([]);
+
+    // Notifications
+    const [notifications, setNotifications] = useState<Notification[]>([]);
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
@@ -48,6 +52,11 @@ export default function AccountScreen() {
                 if (data.id) {
                     const claimed = await getClaimedItems(data.id);
                     setClaimedItems(claimed);
+                }
+                // Fetch notifications
+                if (token) {
+                    const notifs = await getNotifications(token);
+                    setNotifications(notifs);
                 }
             }
         } catch (error) {
@@ -141,6 +150,22 @@ export default function AccountScreen() {
                     styles.actionButton,
                     { backgroundColor: isClosed ? colors.primary + '10' : colors.error + '10' }
                 ]}
+                onPress={() => router.push({ pathname: '/victim/edit-complaint', params: { id: complaint.id } })}
+            >
+                <RefreshCw size={16} color={colors.primary} />
+                <Text style={[
+                    styles.actionText,
+                    { color: colors.primary }
+                ]}>
+                    Edit
+                </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[
+                    styles.actionButton,
+                    { backgroundColor: isClosed ? colors.primary + '10' : colors.error + '10' }
+                ]}
                 onPress={() => handleAction(complaint.id, isClosed ? 'REOPEN' : 'CLOSE')}
             >
                 {isClosed ? (
@@ -202,6 +227,16 @@ export default function AccountScreen() {
                 loading={actionLoading}
             />
 
+            <ConfirmModal
+                visible={logoutModalVisible}
+                title="Logout"
+                message="Are you sure you want to logout?"
+                onConfirm={confirmLogout}
+                onCancel={() => setLogoutModalVisible(false)}
+                confirmText="Logout"
+                type="danger"
+            />
+
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <ArrowLeft size={24} color={colors.text} />
@@ -246,8 +281,8 @@ export default function AccountScreen() {
                     </View>
                 </View>
 
-                {/* Complaints Section */}
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>My Complaints</Text>
+                {/* Reported Items (Lost) Section */}
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Reported Items</Text>
 
                 <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
                     <TouchableOpacity
@@ -277,6 +312,15 @@ export default function AccountScreen() {
                             { color: activeTab === 'CLAIMED' ? colors.primary : colors.textSecondary }
                         ]}>Claimed ({claimedItems.length})</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.tab, activeTab === 'NOTIFIED' && { borderBottomColor: colors.primary }]}
+                        onPress={() => setActiveTab('NOTIFIED')}
+                    >
+                        <Text style={[
+                            styles.tabText,
+                            { color: activeTab === 'NOTIFIED' ? colors.primary : colors.textSecondary }
+                        ]}>Notified ({notifications.length})</Text>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.historyList}>
@@ -300,7 +344,7 @@ export default function AccountScreen() {
                                 </Text>
                             </View>
                         )
-                    ) : (
+                    ) : activeTab === 'CLAIMED' ? (
                         claimedItems.length > 0 ? (
                             claimedItems.map((item: any) => renderClaimedItem(item))
                         ) : (
@@ -310,11 +354,44 @@ export default function AccountScreen() {
                                 </Text>
                             </View>
                         )
+                    ) : (
+                        notifications.length > 0 ? (
+                            notifications.map((notif: Notification) => {
+                                const payload = notif.payload ? JSON.parse(notif.payload) : {};
+                                return (
+                                    <TouchableOpacity
+                                        key={notif.id}
+                                        onPress={() => payload.complaintId && router.push({ pathname: '/victim/edit-complaint', params: { id: payload.complaintId } })}
+                                        style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                                    >
+                                        <View style={styles.historyIcon}>
+                                            <Bell size={20} color={colors.primary} />
+                                        </View>
+                                        <View style={styles.historyContent}>
+                                            <Text style={[styles.historyTitle, { color: colors.text }]}>{notif.title}</Text>
+                                            <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{notif.message}</Text>
+                                            {payload.ownerMessage && (
+                                                <Text style={[styles.reasonText, { color: colors.textSecondary }]}>Note: {payload.ownerMessage}</Text>
+                                            )}
+                                            {payload.founderPhone && (
+                                                <Text style={[styles.reasonText, { color: colors.primary }]}>Contact: {payload.founderPhone}</Text>
+                                            )}
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        ) : (
+                            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                    No notifications yet.
+                                </Text>
+                            </View>
+                        )
                     )}
                 </View>
 
-                {/* Reported Items Section */}
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Reported Items</Text>
+                {/* Found Items Section */}
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Found Items Reports</Text>
                 {profile?.items?.length === 0 ? (
                     <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
