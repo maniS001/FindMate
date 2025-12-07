@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TouchableO
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
+import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { addComplaint, Item, searchItems } from '../../store';
 
@@ -20,6 +21,7 @@ export default function SearchResults() {
     }>();
     const router = useRouter();
     const { colors } = useTheme();
+    const { user } = useAuth();
     const [results, setResults] = useState<Item[]>([]);
     const [loading, setLoading] = useState(false);
     const [filing, setFiling] = useState(false);
@@ -64,6 +66,7 @@ export default function SearchResults() {
                 description: params.description || '',
                 contactInfo: params.contactInfo,
                 imageUris: base64Images,
+                userId: user?.id,
             });
             router.push({
                 pathname: '/success',

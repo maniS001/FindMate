@@ -82,7 +82,7 @@ export default function Signup() {
                             Already have an account?
                         </Text>
                         <Link href="/auth/login" asChild>
-                            <Text style={[styles.link, { color: colors.primary }]}>Login</Text>
+                            <Text style={StyleSheet.flatten([styles.link, { color: colors.primary }])}>Login</Text>
                         </Link>
                     </View>
                 </View>

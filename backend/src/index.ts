@@ -262,9 +262,9 @@ app.get('/api/complaints', async (req, res) => {
                     { category: { contains: String(query), mode: 'insensitive' as const } },
                     { location: { contains: String(query), mode: 'insensitive' as const } },
                 ],
-                status: 'open',
+                status: 'OPEN',
             }
-            : { status: 'open' };
+            : { status: 'OPEN' };
 
         const complaints = await prisma.complaint.findMany({
             where,

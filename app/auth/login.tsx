@@ -124,7 +124,7 @@ export default function Login() {
                             Don't have an account?
                         </Text>
                         <Link href="/auth/signup" asChild>
-                            <Text style={[styles.link, { color: colors.primary }]}>Sign Up</Text>
+                            <Text style={StyleSheet.flatten([styles.link, { color: colors.primary }])}>Sign Up</Text>
                         </Link>
                     </View>
                 </View>
