@@ -42,6 +42,7 @@ export default function AchievementsScreen() {
     };
 
     const renderItem = ({ item }: { item: Complaint | Item }) => {
+        const resolvedDate = (item as any).resolvedAt || (item as any).recoveredAt || item.date;
         let imageUri = null;
         if (item.imageUris) {
             try {
@@ -83,12 +84,12 @@ export default function AchievementsScreen() {
                     <View style={styles.row}>
                         <Calendar size={14} color={colors.textSecondary} />
                         <Text style={[styles.detailText, { color: colors.textSecondary }]}>
-                            {item.resolvedAt ? new Date(item.resolvedAt).toLocaleDateString() : item.date}
+                            {new Date(resolvedDate).toLocaleDateString()}
                         </Text>
                     </View>
                 </View>
 
-                )}
+
 
                 {/* Show Feedback if available (for recovered items) */}
                 {'feedbackComment' in item && item.feedbackComment && (

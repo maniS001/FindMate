@@ -161,6 +161,21 @@ export const recoverItem = async (id: string, feedback: { rating: number; commen
     }
 };
 
+export const notifyOwner = async (id: string, data: { securityAnswer: string; description: string; phone: string }) => {
+    try {
+        const response = await fetch(`${API_URL}/complaints/${id}/notify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error('Failed to notify owner');
+        return await response.json();
+    } catch (error) {
+        console.error('Error notifying owner:', error);
+        throw error;
+    }
+};
+
 export const getRecoveredItems = async (): Promise<Item[]> => {
     try {
         const response = await fetch(`${API_URL}/items?excludeClaimed=false`); // Get all items

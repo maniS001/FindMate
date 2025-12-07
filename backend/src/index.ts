@@ -341,6 +341,48 @@ app.patch('/api/complaints/:id', async (req, res) => {
     }
 });
 
+// Notify Owner (Founder -> Victim)
+app.post('/api/complaints/:id/notify', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { securityAnswer, description, phone } = req.body;
+
+        const complaint = await prisma.complaint.findUnique({
+            where: { id },
+        });
+
+        if (!complaint || !complaint.userId) {
+            return res.status(404).json({ error: 'Complaint or owner not found' });
+        }
+
+        // Create notification for the victim
+        console.log('Creating notification for user:', complaint.userId, { id, phone, securityAnswer });
+        const notification = await prisma.notification.create({
+            data: {
+                userId: complaint.userId,
+                title: 'Someone found your item!',
+                message: `A founder has reached out regarding '${complaint.name}'.`,
+                type: 'CLAIM_REQUEST',
+                payload: JSON.stringify({
+                    complaintId: id,
+                    founderPhone: phone,
+                    securityAnswer,
+                    description
+                }),
+            },
+        });
+        console.log('Notification created:', notification);
+
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('Error in notify endpoint:', error);
+        res.status(500).json({
+            error: 'Failed to notify owner',
+            details: error.message || String(error)
+        });
+    }
+});
+
 // Claim Item
 app.post('/api/items/:id/claim', async (req, res) => {
     try {

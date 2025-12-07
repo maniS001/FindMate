@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Calendar, MapPin, Phone } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
+import NotifyOwnerModal from '../../components/NotifyOwnerModal';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Complaint, getComplaintById, updateComplaintStatus } from '../../store';
+import { Complaint, getComplaintById, notifyOwner, updateComplaintStatus } from '../../store';
 
 const { width } = Dimensions.get('window');
 const IMAGE_WIDTH = width - 48; // 24px padding on each side
@@ -18,6 +19,8 @@ export default function ComplaintDetail() {
     const [complaint, setComplaint] = useState<Complaint | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
+    const [notifyModalVisible, setNotifyModalVisible] = useState(false);
+    const [notifyLoading, setNotifyLoading] = useState(false);
 
     useEffect(() => {
         const fetchComplaint = async () => {
@@ -30,13 +33,18 @@ export default function ComplaintDetail() {
         fetchComplaint();
     }, [id]);
 
-    const handleCall = () => {
-        if (!complaint?.contactInfo) return;
-
-        const phone = complaint.contactInfo.replace(/[^0-9+]/g, '');
-        Linking.openURL(`tel:${phone}`).catch(() => {
-            Alert.alert('Error', 'Unable to make a call');
-        });
+    const handleNotify = async (data: { securityAnswer: string; description: string; phone: string }) => {
+        if (!complaint) return;
+        setNotifyLoading(true);
+        try {
+            await notifyOwner(complaint.id, data);
+            setNotifyModalVisible(false);
+            Alert.alert('Success', 'Owner has been notified securely!');
+        } catch (error) {
+            Alert.alert('Error', 'Failed to notify owner.');
+        } finally {
+            setNotifyLoading(false);
+        }
     };
 
     const handleMarkReturned = async () => {
@@ -175,7 +183,9 @@ export default function ComplaintDetail() {
                             <Phone size={20} color={colors.primary} />
                             <View style={styles.infoContent}>
                                 <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Contact</Text>
-                                <Text style={[styles.infoValue, { color: colors.text }]}>{complaint.contactInfo}</Text>
+                                <Text style={[styles.infoValue, { color: colors.text }]}>
+                                    {isResolved ? complaint.contactInfo : 'Start Notify to Connect'}
+                                </Text>
                             </View>
                         </View>
                     </View>
@@ -192,10 +202,10 @@ export default function ComplaintDetail() {
 
                 <View style={styles.actions}>
                     <Button
-                        title="Call Owner"
-                        onPress={handleCall}
+                        title="Notify Owner"
+                        onPress={() => setNotifyModalVisible(true)}
                         style={{ flex: 1 }}
-                        variant="secondary"
+                        variant="primary"
                     />
                     {!isResolved && (
                         <Button
@@ -207,6 +217,13 @@ export default function ComplaintDetail() {
                     )}
                 </View>
             </ScrollView>
+
+            <NotifyOwnerModal
+                visible={notifyModalVisible}
+                onClose={() => setNotifyModalVisible(false)}
+                onSubmit={handleNotify}
+                loading={notifyLoading}
+            />
         </SafeAreaView>
     );
 }

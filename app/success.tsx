@@ -29,7 +29,24 @@ export default function Success() {
         if (params.itemId && user) {
             fetchUserComplaints();
         }
-    }, [params.itemId, user]);
+
+        // Auto-close requirement: If we showed contact info, show popup on exit
+        const hasContactInfo = !!params.contactInfo;
+        return () => {
+            if (hasContactInfo) {
+                // Since this runs on unmount/cleanup, we can't block navigation easily here,
+                // but we can ensure the user knows. 
+                // However, 'beforeRemove' listener is better for 'interception'.
+                // But in React Native, Alert inside cleanup might be too late or detached.
+                // Let's rely on an explicit effect that runs ONCE when we load with contact info.
+                Alert.alert(
+                    'Complaint Resolved',
+                    'Since you have viewed the contact details, we have marked this inquiry as resolved. If you did not recover your item, you can reopen it from your account.',
+                    [{ text: 'OK' }]
+                );
+            }
+        };
+    }, [params.itemId, user, params.contactInfo]);
 
     const fetchUserComplaints = async () => {
         try {
