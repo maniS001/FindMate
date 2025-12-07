@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { MapPin, Search } from 'lucide-react-native';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,10 +10,20 @@ export default function LandingScreen() {
     const router = useRouter();
     const { colors } = useTheme();
 
+    const [isNavigating, setIsNavigating] = useState(false);
+
     // Wake up the backend server when app loads
     useEffect(() => {
         wakeUpServer();
     }, []);
+
+    const handleNavigation = (path: any) => {
+        if (isNavigating) return;
+        setIsNavigating(true);
+        router.push(path);
+        // Reset after animations usually finish
+        setTimeout(() => setIsNavigating(false), 1000);
+    };
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -31,7 +41,7 @@ export default function LandingScreen() {
                 <View style={styles.content}>
                     <TouchableOpacity
                         style={[styles.card, styles.lostCard]}
-                        onPress={() => router.push('/victim/search')}
+                        onPress={() => handleNavigation('/victim/search')}
                         activeOpacity={0.9}
                     >
                         <View style={styles.iconContainer}>
@@ -43,7 +53,7 @@ export default function LandingScreen() {
 
                     <TouchableOpacity
                         style={[styles.card, styles.foundCard]}
-                        onPress={() => router.push('/founder/complaints')}
+                        onPress={() => handleNavigation('/founder/complaints')}
                         activeOpacity={0.9}
                     >
                         <View style={styles.iconContainer}>

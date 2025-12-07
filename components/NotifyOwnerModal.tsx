@@ -1,5 +1,6 @@
+import { Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import Button from './Button';
 
@@ -7,7 +8,7 @@ interface NotifyOwnerModalProps {
     visible: boolean;
     onClose: () => void;
     onSubmit: (data: {
-        securityAnswer: string;
+        questions: { question: string; answer: string }[];
         description: string;
         phone: string;
     }) => void;
@@ -16,16 +17,33 @@ interface NotifyOwnerModalProps {
 
 export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading }: NotifyOwnerModalProps) {
     const { colors } = useTheme();
-    const [securityAnswer, setSecurityAnswer] = useState('');
+    const [questions, setQuestions] = useState([{ question: '', answer: '' }]);
     const [description, setDescription] = useState('');
     const [phone, setPhone] = useState('');
 
+    const handleAddQuestion = () => {
+        setQuestions([...questions, { question: '', answer: '' }]);
+    };
+
+    const handleRemoveQuestion = (index: number) => {
+        const newQuestions = [...questions];
+        newQuestions.splice(index, 1);
+        setQuestions(newQuestions);
+    };
+
+    const handleQuestionChange = (text: string, index: number, field: 'question' | 'answer') => {
+        const newQuestions = [...questions];
+        newQuestions[index][field] = text;
+        setQuestions(newQuestions);
+    };
+
     const handleSubmit = () => {
-        if (!securityAnswer.trim() || !description.trim() || !phone.trim()) {
-            return; // Validate in UI if needed (show error)
+        const areQuestionsValid = questions.every(q => q.question.trim() && q.answer.trim());
+        if (!areQuestionsValid || !description.trim() || !phone.trim()) {
+            return;
         }
         onSubmit({
-            securityAnswer,
+            questions,
             description,
             phone,
         });
@@ -42,24 +60,48 @@ export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading }
                 <View style={[styles.container, { backgroundColor: colors.surface }]}>
                     <Text style={[styles.title, { color: colors.text }]}>Notify Owner</Text>
                     <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                        Help the owner verify it's you. Providing this info helps them trust you.
-                        They will receive a secure notification.
+                        Help the owner verify it's you. Set security questions they must answer.
                     </Text>
 
                     <ScrollView style={styles.form}>
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, { color: colors.text }]}>Security Answer / Verification Detail</Text>
-                            <Text style={[styles.hint, { color: colors.textSecondary }]}>
-                                Answer to the security question or a unique detail about the item.
-                            </Text>
-                            <TextInput
-                                style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-                                placeholder="e.g., 'Blue cover', 'Pattern code 1234'"
-                                placeholderTextColor={colors.textSecondary}
-                                value={securityAnswer}
-                                onChangeText={setSecurityAnswer}
-                            />
-                        </View>
+                        {questions.map((q, index) => (
+                            <View key={index} style={[styles.questionContainer, { borderColor: colors.border }]}>
+                                <View style={styles.questionHeader}>
+                                    <Text style={[styles.label, { color: colors.text }]}>Security Question {index + 1}</Text>
+                                    {questions.length > 1 && (
+                                        <TouchableOpacity onPress={() => handleRemoveQuestion(index)}>
+                                            <Trash2 size={20} color={colors.error} />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                <View style={styles.inputGroup}>
+                                    <TextInput
+                                        style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                                        placeholder="E.g. What is the wallpaper?"
+                                        placeholderTextColor={colors.textSecondary}
+                                        value={q.question}
+                                        onChangeText={(text) => handleQuestionChange(text, index, 'question')}
+                                    />
+                                </View>
+                                <View style={styles.inputGroup}>
+                                    <TextInput
+                                        style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                                        placeholder="The correct answer"
+                                        placeholderTextColor={colors.textSecondary}
+                                        value={q.answer}
+                                        onChangeText={(text) => handleQuestionChange(text, index, 'answer')}
+                                    />
+                                </View>
+                            </View>
+                        ))}
+
+                        <Button
+                            title="+ Add Another Question"
+                            variant="secondary"
+                            onPress={handleAddQuestion}
+                            style={{ marginBottom: 24 }}
+                        />
 
                         <View style={styles.inputGroup}>
                             <Text style={[styles.label, { color: colors.text }]}>Message to Owner</Text>
@@ -76,9 +118,6 @@ export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading }
 
                         <View style={styles.inputGroup}>
                             <Text style={[styles.label, { color: colors.text }]}>Your Contact Number</Text>
-                            <Text style={[styles.hint, { color: colors.textSecondary }]}>
-                                This will be shared securely only after they verify.
-                            </Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                                 placeholder="+1 234 567 8900"
@@ -101,7 +140,7 @@ export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading }
                             title="Notify"
                             onPress={handleSubmit}
                             loading={loading}
-                            disabled={!securityAnswer || !description || !phone}
+                            disabled={!questions.every(q => q.question.trim() && q.answer.trim()) || !description || !phone}
                             style={{ flex: 1 }}
                         />
                     </View>
@@ -135,8 +174,21 @@ const styles = StyleSheet.create({
     form: {
         marginBottom: 24,
     },
-    inputGroup: {
+    questionContainer: {
         marginBottom: 16,
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+    },
+    questionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    inputGroup: {
+        marginBottom: 12,
     },
     label: {
         fontSize: 14,

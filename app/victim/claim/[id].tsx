@@ -252,12 +252,6 @@ export default function ClaimItem() {
                 >
                     <View style={[styles.headerRow, { marginBottom: 24 }]}>
                         <Text style={[styles.pageTitle, { color: colors.text }]}>Claim Verification</Text>
-                        <Button
-                            title="Cancel"
-                            variant="outline"
-                            onPress={() => setIsClaiming(false)}
-                            style={{ width: 'auto', height: 40, paddingHorizontal: 16 }}
-                        />
                     </View>
 
                     {!isOtpVerified ? (

@@ -7,7 +7,7 @@ import Button from '../../components/Button';
 import Card from '../../components/Card';
 import NotifyOwnerModal from '../../components/NotifyOwnerModal';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Complaint, getComplaintById, notifyOwner, updateComplaintStatus } from '../../store';
+import { Complaint, getComplaintById, notifyOwner } from '../../store';
 
 const { width } = Dimensions.get('window');
 const IMAGE_WIDTH = width - 48; // 24px padding on each side
@@ -33,7 +33,7 @@ export default function ComplaintDetail() {
         fetchComplaint();
     }, [id]);
 
-    const handleNotify = async (data: { securityAnswer: string; description: string; phone: string }) => {
+    const handleNotify = async (data: { questions: { question: string; answer: string }[]; description: string; phone: string }) => {
         if (!complaint) return;
         setNotifyLoading(true);
         try {
@@ -47,33 +47,7 @@ export default function ComplaintDetail() {
         }
     };
 
-    const handleMarkReturned = async () => {
-        if (!complaint) return;
 
-        Alert.alert(
-            'Confirm Return',
-            'Are you sure you want to mark this item as returned to the owner?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Yes, Returned',
-                    onPress: async () => {
-                        setActionLoading(true);
-                        try {
-                            await updateComplaintStatus(complaint.id, 'RESOLVED');
-                            Alert.alert('Success', 'Complaint marked as resolved!', [
-                                { text: 'OK', onPress: () => router.back() }
-                            ]);
-                        } catch (error) {
-                            Alert.alert('Error', 'Failed to update status.');
-                        } finally {
-                            setActionLoading(false);
-                        }
-                    }
-                }
-            ]
-        );
-    };
 
     if (loading) {
         return (
@@ -207,14 +181,6 @@ export default function ComplaintDetail() {
                         style={{ flex: 1 }}
                         variant="primary"
                     />
-                    {!isResolved && (
-                        <Button
-                            title="Mark as Returned"
-                            onPress={handleMarkReturned}
-                            loading={actionLoading}
-                            style={{ flex: 1, backgroundColor: '#10B981' }}
-                        />
-                    )}
                 </View>
             </ScrollView>
 

@@ -345,7 +345,7 @@ app.patch('/api/complaints/:id', async (req, res) => {
 app.post('/api/complaints/:id/notify', async (req, res) => {
     try {
         const { id } = req.params;
-        const { securityAnswer, description, phone } = req.body;
+        const { questions, description, phone } = req.body;
 
         const complaint = await prisma.complaint.findUnique({
             where: { id },
@@ -356,7 +356,7 @@ app.post('/api/complaints/:id/notify', async (req, res) => {
         }
 
         // Create notification for the victim
-        console.log('Creating notification for user:', complaint.userId, { id, phone, securityAnswer });
+        console.log('Creating notification for user:', complaint.userId, { id, phone });
         const notification = await prisma.notification.create({
             data: {
                 userId: complaint.userId,
@@ -366,7 +366,7 @@ app.post('/api/complaints/:id/notify', async (req, res) => {
                 payload: JSON.stringify({
                     complaintId: id,
                     founderPhone: phone,
-                    securityAnswer,
+                    questions,
                     description
                 }),
             },

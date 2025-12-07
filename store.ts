@@ -161,7 +161,7 @@ export const recoverItem = async (id: string, feedback: { rating: number; commen
     }
 };
 
-export const notifyOwner = async (id: string, data: { securityAnswer: string; description: string; phone: string }) => {
+export const notifyOwner = async (id: string, data: { questions: { question: string; answer: string }[]; description: string; phone: string }) => {
     try {
         const response = await fetch(`${API_URL}/complaints/${id}/notify`, {
             method: 'POST',

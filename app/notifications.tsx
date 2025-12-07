@@ -13,6 +13,8 @@ interface Notification {
     message: string;
     read: boolean;
     createdAt: string;
+    type?: string;
+    payload?: string;
 }
 
 export default function NotificationsScreen() {
@@ -42,23 +44,52 @@ export default function NotificationsScreen() {
         }
     };
 
-    const renderItem = ({ item }: { item: Notification }) => (
-        <View style={[styles.notificationItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
-                <Bell size={20} color={colors.primary} />
+    const renderItem = ({ item }: { item: Notification }) => {
+        let payload: any = {};
+        try {
+            payload = item.payload ? JSON.parse(item.payload) : {};
+        } catch (e) {
+            console.error('Error parsing notification payload', e);
+        }
+
+        const isClaimRequest = item.type === 'CLAIM_REQUEST';
+
+        const handleClaim = () => {
+            router.push({
+                pathname: '/victim/verify-notification',
+                params: {
+                    payload: item.payload,
+                    notificationId: item.id
+                }
+            });
+        };
+
+        return (
+            <View style={[styles.notificationItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
+                    <Bell size={20} color={colors.primary} />
+                </View>
+                <View style={styles.contentContainer}>
+                    <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+                    <Text style={[styles.message, { color: colors.textSecondary }]}>{item.message}</Text>
+                    <Text style={[styles.date, { color: colors.textSecondary }]}>
+                        {new Date(item.createdAt).toLocaleDateString()}
+                    </Text>
+                    {isClaimRequest && (
+                        <TouchableOpacity
+                            style={[styles.claimButton, { backgroundColor: colors.primary }]}
+                            onPress={handleClaim}
+                        >
+                            <Text style={styles.claimButtonText}>View & Claim</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+                {!item.read && (
+                    <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+                )}
             </View>
-            <View style={styles.contentContainer}>
-                <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
-                <Text style={[styles.message, { color: colors.textSecondary }]}>{item.message}</Text>
-                <Text style={[styles.date, { color: colors.textSecondary }]}>
-                    {new Date(item.createdAt).toLocaleDateString()}
-                </Text>
-            </View>
-            {!item.read && (
-                <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-            )}
-        </View>
-    );
+        );
+    };
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -160,5 +191,17 @@ const styles = StyleSheet.create({
         height: 8,
         borderRadius: 4,
         marginTop: 6,
+    },
+    claimButton: {
+        alignSelf: 'flex-start',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        marginTop: 8,
+    },
+    claimButtonText: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+        fontSize: 14,
     },
 });
