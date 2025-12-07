@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleProp, StyleSheet, Text, TouchableOpacity, ViewS
 interface ButtonProps {
     title: string;
     onPress: () => void;
-    variant?: 'primary' | 'secondary' | 'outline';
+    variant?: 'primary' | 'secondary' | 'outline' | 'danger';
     loading?: boolean;
     disabled?: boolean;
     style?: StyleProp<ViewStyle>;
@@ -15,6 +15,7 @@ export default function Button({ title, onPress, variant = 'primary', loading = 
         switch (variant) {
             case 'primary': return '#3B82F6';
             case 'secondary': return '#10B981';
+            case 'danger': return '#EF4444';
             case 'outline': return 'transparent';
             default: return '#3B82F6';
         }
@@ -24,6 +25,7 @@ export default function Button({ title, onPress, variant = 'primary', loading = 
         if (disabled) return '#94A3B8';
         switch (variant) {
             case 'outline': return '#3B82F6';
+            case 'danger': return '#FFFFFF';
             default: return '#FFFFFF';
         }
     };

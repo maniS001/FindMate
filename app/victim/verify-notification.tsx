@@ -1,9 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { AlertCircle } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
+import Captcha from '../../components/Captcha';
 import Input from '../../components/Input';
+import OtpModal from '../../components/OtpModal';
+import PaymentModal from '../../components/PaymentModal';
+import { CONFIG } from '../../constants/config';
 import { useTheme } from '../../contexts/ThemeContext';
 import { updateComplaintStatus } from '../../store';
 
@@ -12,6 +17,14 @@ export default function VerifyNotificationScreen() {
     const router = useRouter();
     const { colors } = useTheme();
 
+    // State for Verification Flow
+    const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+    const [showOtpModal, setShowOtpModal] = useState(false);
+    const [isOtpVerified, setIsOtpVerified] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [isPaid, setIsPaid] = useState(false);
+
+    // State for Security Questions
     const [loading, setLoading] = useState(false);
     const [answers, setAnswers] = useState<string[]>([]);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -25,15 +38,42 @@ export default function VerifyNotificationScreen() {
 
     const { questions = [], founderPhone, complaintId, description } = data;
 
+    // --- Step 1: Captcha ---
+    const handleCaptchaVerify = (isValid: boolean) => {
+        setIsCaptchaVerified(isValid);
+        if (isValid && !isOtpVerified) {
+            setTimeout(() => setShowOtpModal(true), 500);
+        }
+    };
+
+    // --- Step 2: OTP ---
+    const handleOtpVerified = () => {
+        setIsOtpVerified(true);
+        setShowOtpModal(false);
+        // Step 3: Trigger Payment if enabled, else go to Questions
+        if (CONFIG.ENABLE_PAYMENT) {
+            setShowPaymentModal(true);
+        } else {
+            setIsPaid(true);
+        }
+    };
+
+    // --- Step 3: Payment ---
+    const handlePaymentSuccess = () => {
+        setShowPaymentModal(false);
+        setIsPaid(true);
+    };
+
+    // --- Step 4: Security Questions ---
     const handleAnswerChange = (text: string, index: number) => {
         const newAnswers = [...answers];
         newAnswers[index] = text;
         setAnswers(newAnswers);
     };
 
-    const handleVerify = async () => {
+    const handleVerifyAnswers = async () => {
         setLoading(true);
-        // Simulate network delay for verification effect
+        // Simulate network delay
         setTimeout(async () => {
             const isCorrect = questions.every((q: any, index: number) => {
                 const userAnswer = answers[index] || '';
@@ -44,7 +84,7 @@ export default function VerifyNotificationScreen() {
                 // Auto-close the complaint if it's correct
                 if (complaintId) {
                     try {
-                        await updateComplaintStatus(complaintId, 'resolved', 'Founder contacted via Notification');
+                        await updateComplaintStatus(complaintId, 'RESOLVED', 'Founder contacted via Notification');
                     } catch (error) {
                         console.error('Failed to auto-close complaint', error);
                     }
@@ -57,6 +97,7 @@ export default function VerifyNotificationScreen() {
         }, 1000);
     };
 
+    // Render Success Screen
     if (showSuccess) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -90,44 +131,80 @@ export default function VerifyNotificationScreen() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <PaymentModal
+                visible={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                onSuccess={handlePaymentSuccess}
+            />
+
+            <OtpModal
+                visible={showOtpModal}
+                onClose={() => setShowOtpModal(false)}
+                onVerified={handleOtpVerified}
+            />
+
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
             >
-                <ScrollView contentContainerStyle={styles.content}>
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                >
                     <Text style={[styles.title, { color: colors.text }]}>Security Check</Text>
-                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                        The founder has set some security questions to verify it's you.
-                    </Text>
 
-                    {description && (
-                        <View style={[styles.messageBox, { backgroundColor: colors.surface }]}>
-                            <Text style={[styles.messageLabel, { color: colors.text }]}>Message from Founder:</Text>
-                            <Text style={[styles.messageText, { color: colors.textSecondary }]}>{description}</Text>
+                    {!isOtpVerified || !isPaid ? (
+                        <View style={styles.section}>
+                            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                                Complete the steps below to verify your identity before answering the founder's questions.
+                            </Text>
+
+                            <View style={styles.warningBox}>
+                                <AlertCircle size={24} color="#B45309" />
+                                <Text style={styles.warningText}>
+                                    Verification required to prevent fraud and ensure you are a genuine claimant.
+                                </Text>
+                            </View>
+
+                            <Captcha onVerify={handleCaptchaVerify} />
+                        </View>
+                    ) : (
+                        <View style={styles.section}>
+                            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                                The founder has set security questions. Answer them to reveal the contact info.
+                            </Text>
+
+                            {description && (
+                                <View style={[styles.messageBox, { backgroundColor: colors.surface }]}>
+                                    <Text style={[styles.messageLabel, { color: colors.text }]}>Message from Founder:</Text>
+                                    <Text style={[styles.messageText, { color: colors.textSecondary }]}>{description}</Text>
+                                </View>
+                            )}
+
+                            <View style={styles.form}>
+                                {questions.map((q: any, index: number) => (
+                                    <View key={index} style={styles.questionContainer}>
+                                        <Text style={[styles.questionText, { color: colors.text }]}>
+                                            {index + 1}. {q.question}
+                                        </Text>
+                                        <Input
+                                            placeholder="Your Answer"
+                                            value={answers[index] || ''}
+                                            onChangeText={(text) => handleAnswerChange(text, index)}
+                                        />
+                                    </View>
+                                ))}
+                            </View>
+
+                            <Button
+                                title="Verify & Reveal Contact"
+                                onPress={handleVerifyAnswers}
+                                loading={loading}
+                                disabled={loading || questions.length === 0}
+                            />
                         </View>
                     )}
-
-                    <View style={styles.form}>
-                        {questions.map((q: any, index: number) => (
-                            <View key={index} style={styles.questionContainer}>
-                                <Text style={[styles.questionText, { color: colors.text }]}>
-                                    {index + 1}. {q.question}
-                                </Text>
-                                <Input
-                                    placeholder="Your Answer"
-                                    value={answers[index] || ''}
-                                    onChangeText={(text) => handleAnswerChange(text, index)}
-                                />
-                            </View>
-                        ))}
-                    </View>
-
-                    <Button
-                        title="Verify Identity"
-                        onPress={handleVerify}
-                        loading={loading}
-                        disabled={loading || questions.length === 0}
-                    />
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -154,7 +231,26 @@ const styles = StyleSheet.create({
     },
     subtitle: {
         fontSize: 16,
-        marginBottom: 32,
+        marginBottom: 24,
+    },
+    section: {
+        gap: 16,
+    },
+    warningBox: {
+        backgroundColor: '#FFFBEB',
+        padding: 16,
+        borderRadius: 16,
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#FEF3C7',
+    },
+    warningText: {
+        flex: 1,
+        color: '#92400E',
+        fontSize: 14,
+        lineHeight: 20,
     },
     messageBox: {
         padding: 16,

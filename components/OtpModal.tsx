@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import Button from './Button';
 import Input from './Input';
 
 import { API_URL } from '../constants/api';
-
-// API Configuration is now managed in constants/api.ts
 
 interface OtpModalProps {
     visible: boolean;
@@ -21,6 +19,11 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
     const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
     const [timer, setTimer] = useState(0);
+    const [message, setMessage] = useState<string | null>(null);
+
+    useEffect(() => {
+        setMessage(null);
+    }, [step]);
 
     useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
@@ -34,7 +37,7 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
 
     const handleSendOtp = async () => {
         if (phone.length < 10) {
-            Alert.alert('Error', 'Please enter a valid phone number');
+            setMessage('Please enter a valid phone number');
             return;
         }
         setLoading(true);
@@ -51,14 +54,13 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
             setStep('otp');
             setTimer(60);
 
-            // For testing, show the code in alert (since we don't have real SMS)
             if (data.debugCode) {
-                Alert.alert('OTP Sent', `Your verification code is: ${data.debugCode}`);
+                setMessage(`OTP Sent! Code: ${data.debugCode}`);
             } else {
-                Alert.alert('OTP Sent', 'Please check your phone for the verification code.');
+                setMessage('OTP sent to your phone.');
             }
         } catch (error: any) {
-            Alert.alert('Error', error.message);
+            setMessage(error.message);
         } finally {
             setLoading(false);
         }
@@ -79,12 +81,12 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
             setTimer(60);
 
             if (data.debugCode) {
-                Alert.alert('OTP Resent', `Your new verification code is: ${data.debugCode}`);
+                setMessage(`OTP Resent! Code: ${data.debugCode}`);
             } else {
-                Alert.alert('OTP Resent', 'Please check your phone for the new verification code.');
+                setMessage('New OTP sent to your phone.');
             }
         } catch (error: any) {
-            Alert.alert('Error', error.message);
+            setMessage(error.message);
         } finally {
             setLoading(false);
         }
@@ -92,7 +94,7 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
 
     const handleVerifyOtp = async () => {
         if (otp.length !== 6) {
-            Alert.alert('Error', 'Please enter a valid 6-digit OTP');
+            setMessage('Please enter a valid 6-digit OTP');
             return;
         }
         setLoading(true);
@@ -109,7 +111,7 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
             onVerified();
             handleClose();
         } catch (error: any) {
-            Alert.alert('Error', error.message);
+            setMessage(error.message);
         } finally {
             setLoading(false);
         }
@@ -120,6 +122,7 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
         setPhone('');
         setOtp('');
         setTimer(0);
+        setMessage(null);
         onClose();
     };
 
@@ -141,6 +144,12 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
                             ? 'We need to verify your phone number before you can report an item.'
                             : `Enter the code sent to ${phone}`}
                     </Text>
+
+                    {message && (
+                        <View style={{ padding: 8, backgroundColor: colors.primary + '10', borderRadius: 8, marginBottom: 8 }}>
+                            <Text style={{ color: colors.primary, textAlign: 'center' }}>{message}</Text>
+                        </View>
+                    )}
 
                     {step === 'phone' ? (
                         <Input

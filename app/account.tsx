@@ -17,6 +17,7 @@ export default function AccountScreen() {
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLOSED' | 'CLAIMED'>('ACTIVE');
+    const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
     // Modal State
     const [modalVisible, setModalVisible] = useState(false);
@@ -56,21 +57,13 @@ export default function AccountScreen() {
         }
     };
 
-    const handleLogout = async () => {
-        Alert.alert(
-            'Logout',
-            'Are you sure you want to logout?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Logout',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await logout();
-                    }
-                }
-            ]
-        );
+    const handleLogout = () => {
+        setLogoutModalVisible(true);
+    };
+
+    const confirmLogout = async () => {
+        await logout();
+        setLogoutModalVisible(false);
     };
 
     const handleAction = (id: string, type: 'CLOSE' | 'REOPEN') => {
