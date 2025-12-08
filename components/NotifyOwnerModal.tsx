@@ -1,7 +1,8 @@
-import { Trash2 } from 'lucide-react-native';
+import { Package, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { Item } from '../store';
 import Button from './Button';
 
 interface NotifyOwnerModalProps {
@@ -11,15 +12,43 @@ interface NotifyOwnerModalProps {
         questions: { question: string; answer: string }[];
         description: string;
         phone: string;
+        itemId?: string;
     }) => void;
     loading?: boolean;
+    userItems?: Item[];
 }
 
-export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading }: NotifyOwnerModalProps) {
+export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading, userItems = [] }: NotifyOwnerModalProps) {
     const { colors } = useTheme();
     const [questions, setQuestions] = useState([{ question: '', answer: '' }]);
     const [description, setDescription] = useState('');
     const [phone, setPhone] = useState('');
+
+    // Item Selection
+    const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+
+    // Filter only OPEN items
+    const openItems = userItems.filter(i => !i.status || i.status === 'OPEN');
+
+    const handleSelectFoundItem = (item: Item) => {
+        if (selectedItemId === item.id) {
+            // Deselect
+            setSelectedItemId(null);
+            setQuestions([{ question: '', answer: '' }]);
+            setDescription('');
+            setPhone('');
+            return;
+        }
+
+        setSelectedItemId(item.id);
+
+        // Pre-fill data from item
+        if (item.questions && item.questions.length > 0) {
+            setQuestions(item.questions.map(q => ({ question: q.question, answer: q.answer })));
+        }
+        if (item.description) setDescription(item.description);
+        if (item.contactInfo) setPhone(item.contactInfo);
+    };
 
     const handleAddQuestion = () => {
         setQuestions([...questions, { question: '', answer: '' }]);
@@ -46,6 +75,7 @@ export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading }
             questions,
             description,
             phone,
+            itemId: selectedItemId || undefined,
         });
     };
 
@@ -60,10 +90,36 @@ export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading }
                 <View style={[styles.container, { backgroundColor: colors.surface }]}>
                     <Text style={[styles.title, { color: colors.text }]}>Notify Owner</Text>
                     <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                        Help the owner verify it's you. Set security questions they must answer.
+                        Link a reported item or manually enter verification details.
                     </Text>
 
                     <ScrollView style={styles.form}>
+                        {openItems.length > 0 && (
+                            <View style={styles.itemSelection}>
+                                <Text style={[styles.label, { color: colors.text }]}>Link Found Item (Optional)</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                                    {openItems.map(item => (
+                                        <TouchableOpacity
+                                            key={item.id}
+                                            style={[
+                                                styles.itemCard,
+                                                selectedItemId === item.id ? { borderColor: colors.primary, backgroundColor: colors.primary + '10' } : { borderColor: colors.border }
+                                            ]}
+                                            onPress={() => handleSelectFoundItem(item)}
+                                        >
+                                            <Package size={16} color={selectedItemId === item.id ? colors.primary : colors.textSecondary} />
+                                            <Text style={[
+                                                styles.itemCardText,
+                                                { color: selectedItemId === item.id ? colors.primary : colors.text }
+                                            ]}>
+                                                {item.name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
                         {questions.map((q, index) => (
                             <View key={index} style={[styles.questionContainer, { borderColor: colors.border }]}>
                                 <View style={styles.questionHeader}>
@@ -137,7 +193,7 @@ export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading }
                             style={{ flex: 1 }}
                         />
                         <Button
-                            title="Notify"
+                            title={selectedItemId ? "Notify & Link Item" : "Notify"}
                             onPress={handleSubmit}
                             loading={loading}
                             disabled={!questions.every(q => q.question.trim() && q.answer.trim()) || !description || !phone}
@@ -160,7 +216,7 @@ const styles = StyleSheet.create({
     container: {
         borderRadius: 24,
         padding: 24,
-        maxHeight: '80%',
+        maxHeight: '90%',
     },
     title: {
         fontSize: 24,
@@ -173,6 +229,22 @@ const styles = StyleSheet.create({
     },
     form: {
         marginBottom: 24,
+    },
+    itemSelection: {
+        marginBottom: 24,
+    },
+    itemCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginRight: 8,
+    },
+    itemCardText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     questionContainer: {
         marginBottom: 16,
@@ -194,11 +266,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         marginBottom: 8,
-    },
-    hint: {
-        fontSize: 12,
-        marginBottom: 8,
-        fontStyle: 'italic',
     },
     input: {
         borderRadius: 12,

@@ -355,7 +355,7 @@ app.patch('/api/complaints/:id', async (req, res) => {
 app.post('/api/complaints/:id/notify', async (req, res) => {
     try {
         const { id } = req.params;
-        const { questions, description, phone } = req.body;
+        const { questions, description, phone, itemId } = req.body;
 
         const complaint = await prisma.complaint.findUnique({
             where: { id },
@@ -377,11 +377,20 @@ app.post('/api/complaints/:id/notify', async (req, res) => {
                     complaintId: id,
                     founderPhone: phone,
                     questions,
-                    description
+                    description,
+                    itemId // Include itemId in payload if needed for referencing back
                 }),
             },
         });
         console.log('Notification created:', notification);
+
+        // Update Found Item status to NOTIFIED if itemId is provided
+        if (itemId) {
+            await prisma.item.update({
+                where: { id: itemId },
+                data: { status: 'NOTIFIED' }
+            });
+        }
 
         res.json({ success: true });
     } catch (error: any) {

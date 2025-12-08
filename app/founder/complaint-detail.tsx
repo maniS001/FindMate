@@ -6,8 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import NotifyOwnerModal from '../../components/NotifyOwnerModal';
+import { API_URL } from '../../constants/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Complaint, getComplaintById, notifyOwner, updateComplaintStatus } from '../../store';
+import { Complaint, getComplaintById, Item, notifyOwner, updateComplaintStatus } from '../../store';
 
 const { width } = Dimensions.get('window');
 const IMAGE_WIDTH = width - 48; // 24px padding on each side
@@ -15,29 +17,48 @@ const IMAGE_WIDTH = width - 48; // 24px padding on each side
 export default function ComplaintDetail() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const { colors } = useTheme();
+    const { token } = useAuth();
     const router = useRouter();
     const [complaint, setComplaint] = useState<Complaint | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [notifyModalVisible, setNotifyModalVisible] = useState(false);
     const [notifyLoading, setNotifyLoading] = useState(false);
+    const [userItems, setUserItems] = useState<Item[]>([]);
 
     useEffect(() => {
-        const fetchComplaint = async () => {
+        const fetchData = async () => {
             if (id) {
                 const fetchedComplaint = await getComplaintById(id);
                 setComplaint(fetchedComplaint);
             }
+
+            if (token) {
+                try {
+                    const response = await fetch(`${API_URL}/auth/me`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setUserItems(data.items || []);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch user items', error);
+                }
+            }
             setLoading(false);
         };
-        fetchComplaint();
-    }, [id]);
+        fetchData();
+    }, [id, token]);
 
-    const handleNotify = async (data: { questions: { question: string; answer: string }[]; description: string; phone: string }) => {
+    const handleNotify = async (data: { questions: { question: string; answer: string }[]; description: string; phone: string; itemId?: string }) => {
         if (!complaint) return;
         setNotifyLoading(true);
         try {
-            await notifyOwner(complaint.id, data);
+            await notifyOwner(complaint.id, {
+                ...data,
+                itemId: data.itemId || '' // Pass itemId (empty string if undefined, but interface needs string)
+            });
 
             // Update complaint status to NOTIFIED locally and on backend
             await updateComplaintStatus(complaint.id, 'NOTIFIED');
@@ -51,8 +72,6 @@ export default function ComplaintDetail() {
             setNotifyLoading(false);
         }
     };
-
-
 
     if (loading) {
         return (
@@ -194,6 +213,7 @@ export default function ComplaintDetail() {
                 onClose={() => setNotifyModalVisible(false)}
                 onSubmit={handleNotify}
                 loading={notifyLoading}
+                userItems={userItems}
             />
         </SafeAreaView>
     );

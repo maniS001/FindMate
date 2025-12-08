@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ArrowLeft, Bell, FileText, LogOut, Package, RefreshCw, Star, XCircle } from 'lucide-react-native';
+import { ArrowLeft, Bell, CheckCircle, Edit2, FileText, LogOut, Package, RefreshCw, Star, XCircle } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +17,7 @@ export default function AccountScreen() {
     const { user, logout, token } = useAuth();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLOSED' | 'CLAIMED' | 'NOTIFIED'>('ACTIVE');
+    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLOSED' | 'CLAIMED'>('ACTIVE');
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
     // Modal State
@@ -48,12 +48,10 @@ export default function AccountScreen() {
             const data = await response.json();
             if (response.ok) {
                 setProfile(data);
-                // Fetch claimed items
                 if (data.id) {
                     const claimed = await getClaimedItems(data.id);
                     setClaimedItems(claimed);
                 }
-                // Fetch notifications
                 if (token) {
                     const notifs = await getNotifications(token);
                     setNotifications(notifs);
@@ -88,8 +86,6 @@ export default function AccountScreen() {
         try {
             const newStatus = modalType === 'CLOSE' ? 'CLOSED' : 'OPEN';
             await updateComplaintStatus(selectedComplaintId, newStatus, reason);
-
-            // Refresh profile to show updates
             await fetchProfile();
             setModalVisible(false);
             Alert.alert('Success', `Complaint ${modalType === 'CLOSE' ? 'closed' : 'reopened'} successfully.`);
@@ -107,17 +103,40 @@ export default function AccountScreen() {
 
     const handleSubmitFeedback = async (rating: number, comment: string) => {
         if (!selectedItemId) return;
-
         setActionLoading(true);
         try {
             await recoverItem(selectedItemId, { rating, comment });
-            await fetchProfile(); // Refresh claimed list status
+            await fetchProfile();
             setShowFeedbackModal(false);
             Alert.alert('Success', 'Item marked as recovered and feedback submitted!');
         } catch (error) {
             Alert.alert('Error', 'Failed to mark item as recovered.');
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const handleVerifyAndClaim = (complaintId: string) => {
+        const relatedNotification = notifications.find(n => {
+            try {
+                const payload = n.payload ? JSON.parse(n.payload) : {};
+                return payload.complaintId === complaintId;
+            } catch (e) {
+                return false;
+            }
+        });
+
+        if (relatedNotification && relatedNotification.payload) {
+            const payload = JSON.parse(relatedNotification.payload);
+            router.push({
+                pathname: '/victim/verify-notification',
+                params: {
+                    payload: relatedNotification.payload,
+                    notificationId: relatedNotification.id
+                }
+            });
+        } else {
+            Alert.alert('Error', 'Could not find notification details for this verification.');
         }
     };
 
@@ -132,56 +151,77 @@ export default function AccountScreen() {
     const activeComplaints = profile?.complaints?.filter((c: any) => c.status !== 'CLOSED' && c.status !== 'RESOLVED') || [];
     const closedComplaints = profile?.complaints?.filter((c: any) => c.status === 'CLOSED' || c.status === 'RESOLVED') || [];
 
-    const renderComplaintItem = (complaint: any, isClosed: boolean) => (
-        <View key={complaint.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.historyIcon}>
-                <FileText size={20} color={isClosed ? colors.success : colors.error} />
-            </View>
-            <View style={styles.historyContent}>
-                <Text style={[styles.historyTitle, { color: colors.text }]}>{complaint.name}</Text>
-                <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{complaint.date}</Text>
-                {isClosed && complaint.closureReason && (
-                    <Text style={[styles.reasonText, { color: colors.textSecondary }]}>Reason: {complaint.closureReason}</Text>
+    const renderComplaintItem = (complaint: any, isClosed: boolean) => {
+        const isNotified = complaint.status === 'NOTIFIED';
+
+        return (
+            <View key={complaint.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={styles.historyIcon}>
+                    {isNotified ? (
+                        <Bell size={20} color={colors.primary} />
+                    ) : (
+                        <FileText size={20} color={isClosed ? colors.success : colors.error} />
+                    )}
+                </View>
+                <View style={styles.historyContent}>
+                    <View style={styles.titleRow}>
+                        <Text style={[styles.historyTitle, { color: colors.text }]}>{complaint.name}</Text>
+                        {isNotified && (
+                            <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
+                                <Text style={[styles.badgeText, { color: colors.primary }]}>NOTIFIED</Text>
+                            </View>
+                        )}
+                    </View>
+                    <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{complaint.date}</Text>
+                    {isClosed && complaint.closureReason && (
+                        <Text style={[styles.reasonText, { color: colors.textSecondary }]}>Reason: {complaint.closureReason}</Text>
+                    )}
+                </View>
+
+                {/* Actions for Active (Open/Notified) Complaints */}
+                {!isClosed && (
+                    <View style={{ gap: 8 }}>
+                        {isNotified ? (
+                            <TouchableOpacity
+                                style={[styles.actionButton, { backgroundColor: colors.success + '10' }]}
+                                onPress={() => handleVerifyAndClaim(complaint.id)}
+                            >
+                                <CheckCircle size={16} color={colors.success} />
+                                <Text style={[styles.actionText, { color: colors.success }]}>Verify & Claim</Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
+                                onPress={() => router.push({ pathname: '/victim/edit-complaint', params: { id: complaint.id } })}
+                            >
+                                <Edit2 size={16} color={colors.primary} />
+                                <Text style={[styles.actionText, { color: colors.primary }]}>Edit Report</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                            style={[styles.actionButton, { backgroundColor: colors.error + '10' }]}
+                            onPress={() => handleAction(complaint.id, 'CLOSE')}
+                        >
+                            <XCircle size={16} color={colors.error} />
+                            <Text style={[styles.actionText, { color: colors.error }]}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* Action for Closed Complaints */}
+                {isClosed && (
+                    <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
+                        onPress={() => handleAction(complaint.id, 'REOPEN')}
+                    >
+                        <RefreshCw size={16} color={colors.primary} />
+                        <Text style={[styles.actionText, { color: colors.primary }]}>Raise Again</Text>
+                    </TouchableOpacity>
                 )}
             </View>
-
-            <TouchableOpacity
-                style={[
-                    styles.actionButton,
-                    { backgroundColor: isClosed ? colors.primary + '10' : colors.error + '10' }
-                ]}
-                onPress={() => router.push({ pathname: '/victim/edit-complaint', params: { id: complaint.id } })}
-            >
-                <RefreshCw size={16} color={colors.primary} />
-                <Text style={[
-                    styles.actionText,
-                    { color: colors.primary }
-                ]}>
-                    Edit
-                </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-                style={[
-                    styles.actionButton,
-                    { backgroundColor: isClosed ? colors.primary + '10' : colors.error + '10' }
-                ]}
-                onPress={() => handleAction(complaint.id, isClosed ? 'REOPEN' : 'CLOSE')}
-            >
-                {isClosed ? (
-                    <RefreshCw size={16} color={colors.primary} />
-                ) : (
-                    <XCircle size={16} color={colors.error} />
-                )}
-                <Text style={[
-                    styles.actionText,
-                    { color: isClosed ? colors.primary : colors.error }
-                ]}>
-                    {isClosed ? 'Raise Again' : 'Close'}
-                </Text>
-            </TouchableOpacity>
-        </View>
-    );
+        );
+    };
 
     const renderClaimedItem = (item: any) => (
         <View key={item.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -312,15 +352,6 @@ export default function AccountScreen() {
                             { color: activeTab === 'CLAIMED' ? colors.primary : colors.textSecondary }
                         ]}>Claimed ({claimedItems.length})</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.tab, activeTab === 'NOTIFIED' && { borderBottomColor: colors.primary }]}
-                        onPress={() => setActiveTab('NOTIFIED')}
-                    >
-                        <Text style={[
-                            styles.tabText,
-                            { color: activeTab === 'NOTIFIED' ? colors.primary : colors.textSecondary }
-                        ]}>Notified ({notifications.length})</Text>
-                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.historyList}>
@@ -344,46 +375,13 @@ export default function AccountScreen() {
                                 </Text>
                             </View>
                         )
-                    ) : activeTab === 'CLAIMED' ? (
+                    ) : (
                         claimedItems.length > 0 ? (
                             claimedItems.map((item: any) => renderClaimedItem(item))
                         ) : (
                             <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                                     No claimed items.
-                                </Text>
-                            </View>
-                        )
-                    ) : (
-                        notifications.length > 0 ? (
-                            notifications.map((notif: Notification) => {
-                                const payload = notif.payload ? JSON.parse(notif.payload) : {};
-                                return (
-                                    <TouchableOpacity
-                                        key={notif.id}
-                                        onPress={() => payload.complaintId && router.push({ pathname: '/victim/edit-complaint', params: { id: payload.complaintId } })}
-                                        style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                                    >
-                                        <View style={styles.historyIcon}>
-                                            <Bell size={20} color={colors.primary} />
-                                        </View>
-                                        <View style={styles.historyContent}>
-                                            <Text style={[styles.historyTitle, { color: colors.text }]}>{notif.title}</Text>
-                                            <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{notif.message}</Text>
-                                            {payload.ownerMessage && (
-                                                <Text style={[styles.reasonText, { color: colors.textSecondary }]}>Note: {payload.ownerMessage}</Text>
-                                            )}
-                                            {payload.founderPhone && (
-                                                <Text style={[styles.reasonText, { color: colors.primary }]}>Contact: {payload.founderPhone}</Text>
-                                            )}
-                                        </View>
-                                    </TouchableOpacity>
-                                );
-                            })
-                        ) : (
-                            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                                    No notifications yet.
                                 </Text>
                             </View>
                         )
@@ -406,7 +404,14 @@ export default function AccountScreen() {
                                     <Package size={20} color={colors.primary} />
                                 </View>
                                 <View style={styles.historyContent}>
-                                    <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
+                                    <View style={styles.titleRow}>
+                                        <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
+                                        {item.status === 'NOTIFIED' && (
+                                            <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
+                                                <Text style={[styles.badgeText, { color: colors.primary }]}>NOTIFIED</Text>
+                                            </View>
+                                        )}
+                                    </View>
                                     <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
                                     {item.status === 'RECOVERED' && item.feedbackRating && (
                                         <View style={{ marginTop: 4 }}>
@@ -415,14 +420,24 @@ export default function AccountScreen() {
                                                     <Star key={i} size={12} color="#F59E0B" fill="#F59E0B" />
                                                 ))}
                                             </View>
-                                            {item.feedbackComment && (
-                                                <Text style={[styles.reasonText, { color: colors.textSecondary }]}>"{item.feedbackComment}"</Text>
-                                            )}
                                         </View>
                                     )}
                                 </View>
-                                <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                                    <Text style={[styles.badgeText, { color: colors.primary }]}>{item.status || 'OPEN'}</Text>
+
+                                <View style={{ gap: 8 }}>
+                                    {(item.status === 'OPEN' || item.status === 'NOTIFIED') ? (
+                                        <TouchableOpacity
+                                            style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
+                                            onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
+                                        >
+                                            <Edit2 size={16} color={colors.primary} />
+                                            <Text style={[styles.actionText, { color: colors.primary }]}>Edit</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
+                                            <Text style={[styles.badgeText, { color: colors.primary }]}>{item.status || 'OPEN'}</Text>
+                                        </View>
+                                    )}
                                 </View>
                             </View>
                         ))}
@@ -535,6 +550,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         borderWidth: 1,
         gap: 12,
+        justifyContent: 'space-between',
     },
     historyIcon: {
         width: 40,
@@ -547,6 +563,12 @@ const styles = StyleSheet.create({
     historyContent: {
         flex: 1,
     },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
+    },
     historyTitle: {
         fontSize: 16,
         fontWeight: '600',
@@ -558,6 +580,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 8,
+        alignSelf: 'flex-start',
     },
     badgeText: {
         fontSize: 10,
@@ -586,6 +609,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 20,
+        alignSelf: 'flex-end',
     },
     actionText: {
         fontSize: 12,

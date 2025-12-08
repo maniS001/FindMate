@@ -15,7 +15,7 @@ export interface Item {
     imageUri?: string; // Main image for backward compatibility/preview
     imageUris?: string[]; // All images
     userId?: string;
-    status?: 'OPEN' | 'CLAIMED' | 'RESOLVED' | 'RECOVERED';
+    status?: 'OPEN' | 'CLAIMED' | 'RESOLVED' | 'RECOVERED' | 'NOTIFIED';
     claimedByUserId?: string;
     recoveredAt?: string;
     feedbackRating?: number;
@@ -140,6 +140,22 @@ export const updateItemStatus = async (id: string, status: string): Promise<Item
     }
 };
 
+export const updateItem = async (id: string, data: Partial<Item>): Promise<Item | null> => {
+    try {
+        const response = await fetch(`${API_URL}/items/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error('Failed to update item');
+        return await response.json();
+    } catch (error) {
+        console.error('Error updating item:', error);
+        return null;
+    }
+};
+
+
 export const claimItem = async (id: string, userId: string): Promise<Item | null> => {
     try {
         const response = await fetch(`${API_URL}/items/${id}/claim`, {
@@ -173,7 +189,7 @@ export const recoverItem = async (id: string, feedback: { rating: number; commen
     }
 };
 
-export const notifyOwner = async (id: string, data: { questions: { question: string; answer: string }[]; description: string; phone: string }) => {
+export const notifyOwner = async (id: string, data: { questions: { question: string; answer: string }[]; description: string; phone: string; itemId: string }) => {
     try {
         const response = await fetch(`${API_URL}/complaints/${id}/notify`, {
             method: 'POST',
