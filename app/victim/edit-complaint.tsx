@@ -43,7 +43,11 @@ export default function EditComplaint() {
                     location: data.location,
                     description: data.description,
                     contactInfo: data.contactInfo,
-                    imageUris: data.imageUris ? JSON.parse(JSON.stringify(data.imageUris)) : [],
+                    imageUris: Array.isArray(data.imageUris)
+                        ? data.imageUris
+                        : (typeof data.imageUris === 'string'
+                            ? JSON.parse(data.imageUris)
+                            : []),
                 });
                 setDate(new Date(data.date));
             } else {

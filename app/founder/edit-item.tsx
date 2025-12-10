@@ -37,8 +37,8 @@ export default function EditFoundItem() {
                         category: item.category,
                         location: item.location,
                         description: item.description,
-                        questions: item.questions && item.questions.length > 0
-                            ? item.questions.map(q => ({ question: q.question, answer: q.answer }))
+                        questions: (item.questions && Array.isArray(item.questions) && item.questions.length > 0)
+                            ? item.questions.map((q: any) => ({ question: q.question || '', answer: q.answer || '' }))
                             : [{ question: '', answer: '' }],
                         contactInfo: item.contactInfo,
                         imageUris: item.imageUris || (item.imageUri ? [item.imageUri] : []),

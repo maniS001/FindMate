@@ -106,7 +106,10 @@ app.get('/api/auth/me', authenticateToken, async (req: any, res) => {
         const user = await prisma.user.findUnique({
             where: { id: req.user.id },
             include: {
-                items: { orderBy: { createdAt: 'desc' } },
+                items: {
+                    orderBy: { createdAt: 'desc' },
+                    include: { questions: true }
+                },
                 complaints: { orderBy: { createdAt: 'desc' } },
                 notifications: { orderBy: { createdAt: 'desc' } },
             },
@@ -226,7 +229,7 @@ app.get('/api/items', async (req, res) => {
         }
 
         if (excludeClaimed === 'true') {
-            where.status = 'OPEN';
+            where.status = { in: ['OPEN', 'NOTIFIED'] };
         }
 
         const items = await prisma.item.findMany({
@@ -302,20 +305,47 @@ app.get('/api/complaints/:id', async (req, res) => {
     }
 });
 
-// Update Item Status
+// Update Item (Status and Details)
 app.patch('/api/items/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { status } = req.body;
+        const { status, name, category, location, date, description, contactInfo, imageUris, questions } = req.body;
+
+        const data: any = {};
+        if (status) data.status = status;
+        if (name) data.name = name;
+        if (category) data.category = category;
+        if (location) data.location = location;
+        if (date) data.date = date;
+        if (description) data.description = description;
+        if (contactInfo) data.contactInfo = contactInfo;
+
+        // Handle images array
+        if (imageUris) {
+            // Prisma expects string[] for scalar list
+            data.imageUris = imageUris;
+        }
+
+        // Handle nested questions update if provided
+        if (questions) {
+            data.questions = {
+                deleteMany: {}, // Delete all existing questions
+                create: questions.map((q: any) => ({
+                    question: q.question,
+                    answer: q.answer
+                }))
+            };
+        }
 
         const item = await prisma.item.update({
             where: { id },
-            data: { status },
+            data,
+            include: { questions: true }
         });
         res.json(item);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Failed to update item status' });
+        res.status(500).json({ error: 'Failed to update item' });
     }
 });
 

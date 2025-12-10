@@ -42,7 +42,7 @@ export default function AccountScreen() {
 
     const fetchProfile = async () => {
         try {
-            const response = await fetch(`${API_URL}/auth/me`, {
+            const response = await fetch(`${API_URL}/auth/me?_t=${Date.now()}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await response.json();
@@ -322,7 +322,7 @@ export default function AccountScreen() {
                 </View>
 
                 {/* Reported Items (Lost) Section */}
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Reported Items</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>My Complaints</Text>
 
                 <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
                     <TouchableOpacity
@@ -389,7 +389,7 @@ export default function AccountScreen() {
                 </View>
 
                 {/* Found Items Section */}
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Found Items Reports</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Reported Items</Text>
                 {profile?.items?.length === 0 ? (
                     <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
