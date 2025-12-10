@@ -189,11 +189,14 @@ export const recoverItem = async (id: string, feedback: { rating: number; commen
     }
 };
 
-export const notifyOwner = async (id: string, data: { questions: { question: string; answer: string }[]; description: string; phone: string; itemId: string }) => {
+export const notifyOwner = async (id: string, data: { questions: { question: string; answer: string }[]; description: string; phone: string; itemId: string }, token: string) => {
     try {
         const response = await fetch(`${API_URL}/complaints/${id}/notify`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify(data),
         });
         if (!response.ok) throw new Error('Failed to notify owner');

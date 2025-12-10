@@ -52,20 +52,23 @@ export default function ComplaintDetail() {
     }, [id, token]);
 
     const handleNotify = async (data: { questions: { question: string; answer: string }[]; description: string; phone: string; itemId?: string }) => {
-        if (!complaint) return;
+        if (!complaint || !token) return;
         setNotifyLoading(true);
         try {
             await notifyOwner(complaint.id, {
                 ...data,
-                itemId: data.itemId || '' // Pass itemId (empty string if undefined, but interface needs string)
-            });
+                itemId: data.itemId || ''
+            }, token);
 
             // Update complaint status to NOTIFIED locally and on backend
             await updateComplaintStatus(complaint.id, 'NOTIFIED');
 
             setNotifyModalVisible(false);
-            Alert.alert('Success', 'Owner has been notified securely!');
-            router.back(); // Go back to list to see updated status
+            // Navigate to success screen
+            router.push({
+                pathname: '/success',
+                params: { type: 'notified' }
+            });
         } catch (error) {
             Alert.alert('Error', 'Failed to notify owner.');
         } finally {

@@ -51,9 +51,11 @@ export default function FileComplaint() {
                 imageUris: base64Images,
                 userId: user?.id, // Link to current user
             });
-            Alert.alert('Success', 'Your complaint has been filed successfully! You will be notified if a match is found.', [
-                { text: 'OK', onPress: () => router.back() }
-            ]);
+            // Navigate to success screen
+            router.push({
+                pathname: '/success',
+                params: { type: 'complaint' }
+            });
         } catch (error) {
             console.error('Submit error:', error);
             Alert.alert('Error', 'Failed to file complaint. Please try again.');

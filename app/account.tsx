@@ -388,44 +388,31 @@ export default function AccountScreen() {
                     )}
                 </View>
 
-                {/* Found Items Section */}
+                {/* Reported Items (Found) Section */}
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Reported Items</Text>
-                {profile?.items?.length === 0 ? (
+
+                {(!profile?.items || profile?.items?.length === 0) ? (
                     <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                             No items reported yet.
                         </Text>
                     </View>
                 ) : (
-                    <View style={styles.historyList}>
-                        {profile?.items?.map((item: any) => (
-                            <View key={item.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                                <View style={styles.historyIcon}>
-                                    <Package size={20} color={colors.primary} />
-                                </View>
-                                <View style={styles.historyContent}>
-                                    <View style={styles.titleRow}>
-                                        <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
-                                        {item.status === 'NOTIFIED' && (
-                                            <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                                                <Text style={[styles.badgeText, { color: colors.primary }]}>NOTIFIED</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                    <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
-                                    {item.status === 'RECOVERED' && item.feedbackRating && (
-                                        <View style={{ marginTop: 4 }}>
-                                            <View style={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
-                                                {[...Array(item.feedbackRating)].map((_, i) => (
-                                                    <Star key={i} size={12} color="#F59E0B" fill="#F59E0B" />
-                                                ))}
-                                            </View>
+                    <View style={{ gap: 24 }}>
+                        {/* Open Reports Sub-section */}
+                        {profile?.items?.filter((i: any) => i.status === 'OPEN').length > 0 && (
+                            <View style={{ gap: 12 }}>
+                                <Text style={[styles.subSectionTitle, { color: colors.textSecondary }]}>My Found Items (Open)</Text>
+                                {profile?.items?.filter((i: any) => i.status === 'OPEN').map((item: any) => (
+                                    <View key={item.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                        <View style={styles.historyIcon}>
+                                            <Package size={20} color={colors.primary} />
                                         </View>
-                                    )}
-                                </View>
+                                        <View style={styles.historyContent}>
+                                            <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
+                                            <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                                        </View>
 
-                                <View style={{ gap: 8 }}>
-                                    {(item.status === 'OPEN' || item.status === 'NOTIFIED') ? (
                                         <TouchableOpacity
                                             style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
                                             onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
@@ -433,14 +420,71 @@ export default function AccountScreen() {
                                             <Edit2 size={16} color={colors.primary} />
                                             <Text style={[styles.actionText, { color: colors.primary }]}>Edit</Text>
                                         </TouchableOpacity>
-                                    ) : (
-                                        <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                                            <Text style={[styles.badgeText, { color: colors.primary }]}>{item.status || 'OPEN'}</Text>
-                                        </View>
-                                    )}
-                                </View>
+                                    </View>
+                                ))}
                             </View>
-                        ))}
+                        )}
+
+                        {/* Notified Matches Sub-section */}
+                        {profile?.items?.filter((i: any) => i.status === 'NOTIFIED').length > 0 && (
+                            <View style={{ gap: 12 }}>
+                                <Text style={[styles.subSectionTitle, { color: colors.textSecondary }]}>Notified Matches</Text>
+                                {profile?.items?.filter((i: any) => i.status === 'NOTIFIED').map((item: any) => (
+                                    <View key={item.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                        <View style={styles.historyIcon}>
+                                            <Bell size={20} color={colors.primary} />
+                                        </View>
+                                        <View style={styles.historyContent}>
+                                            <View style={styles.titleRow}>
+                                                <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
+                                                <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
+                                                    <Text style={[styles.badgeText, { color: colors.primary }]}>NOTIFIED</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                                        </View>
+
+                                        <TouchableOpacity
+                                            style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
+                                            onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
+                                        >
+                                            <Edit2 size={16} color={colors.primary} />
+                                            <Text style={[styles.actionText, { color: colors.primary }]}>Edit Details</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Recovered/Claimed Items Sub-section */}
+                        {profile?.items?.filter((i: any) => i.status === 'CLAIMED' || i.status === 'RECOVERED').length > 0 && (
+                            <View style={{ gap: 12 }}>
+                                <Text style={[styles.subSectionTitle, { color: colors.textSecondary }]}>Resolved Items</Text>
+                                {profile?.items?.filter((i: any) => i.status === 'CLAIMED' || i.status === 'RECOVERED').map((item: any) => (
+                                    <View key={item.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                        <View style={styles.historyIcon}>
+                                            <CheckCircle size={20} color={colors.success} />
+                                        </View>
+                                        <View style={styles.historyContent}>
+                                            <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
+                                            <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                                            {item.status === 'RECOVERED' && item.feedbackRating && (
+                                                <View style={{ marginTop: 4 }}>
+                                                    <View style={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+                                                        {[...Array(item.feedbackRating)].map((_, i) => (
+                                                            <Star key={i} size={12} color="#F59E0B" fill="#F59E0B" />
+                                                        ))}
+                                                    </View>
+                                                </View>
+                                            )}
+                                        </View>
+                                        <View style={[styles.badge, { backgroundColor: colors.success + '20' }]}>
+                                            <Text style={[styles.badgeText, { color: colors.success }]}>{item.status}</Text>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
                     </View>
                 )}
             </ScrollView>
@@ -530,6 +574,12 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         marginBottom: -8,
+    },
+    subSectionTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 4,
+        marginTop: 8,
     },
     emptyState: {
         padding: 32,

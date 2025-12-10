@@ -382,10 +382,11 @@ app.patch('/api/complaints/:id', async (req, res) => {
 });
 
 // Notify Owner (Founder -> Victim)
-app.post('/api/complaints/:id/notify', async (req, res) => {
+app.post('/api/complaints/:id/notify', authenticateToken, async (req: any, res) => {
     try {
         const { id } = req.params;
         const { questions, description, phone, itemId } = req.body;
+        const founderUserId = req.user.id;
 
         const complaint = await prisma.complaint.findUnique({
             where: { id },
@@ -393,6 +394,38 @@ app.post('/api/complaints/:id/notify', async (req, res) => {
 
         if (!complaint || !complaint.userId) {
             return res.status(404).json({ error: 'Complaint or owner not found' });
+        }
+
+        // Handle Item Linking or Creation
+        let finalItemId = itemId;
+        if (!finalItemId) {
+            // Create a "Shadow Item" to track this notification
+            const newItem = await prisma.item.create({
+                data: {
+                    name: `Found: ${complaint.name}`,
+                    category: complaint.category,
+                    location: complaint.location, // Approximate
+                    date: new Date().toISOString().split('T')[0],
+                    description: description || `Matches complaint: ${complaint.description}`,
+                    contactInfo: phone,
+                    imageUris: [],
+                    userId: founderUserId,
+                    status: 'NOTIFIED',
+                    questions: {
+                        create: questions ? questions.map((q: any) => ({
+                            question: q.question,
+                            answer: q.answer
+                        })) : []
+                    }
+                }
+            });
+            finalItemId = newItem.id;
+        } else {
+            // Update existing item status
+            await prisma.item.update({
+                where: { id: finalItemId },
+                data: { status: 'NOTIFIED' }
+            });
         }
 
         // Create notification for the victim
@@ -408,21 +441,13 @@ app.post('/api/complaints/:id/notify', async (req, res) => {
                     founderPhone: phone,
                     questions,
                     description,
-                    itemId // Include itemId in payload if needed for referencing back
+                    itemId: finalItemId
                 }),
             },
         });
         console.log('Notification created:', notification);
 
-        // Update Found Item status to NOTIFIED if itemId is provided
-        if (itemId) {
-            await prisma.item.update({
-                where: { id: itemId },
-                data: { status: 'NOTIFIED' }
-            });
-        }
-
-        res.json({ success: true });
+        res.json({ success: true, itemId: finalItemId });
     } catch (error: any) {
         console.error('Error in notify endpoint:', error);
         res.status(500).json({

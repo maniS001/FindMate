@@ -34,11 +34,6 @@ export default function Success() {
         const hasContactInfo = !!params.contactInfo;
         return () => {
             if (hasContactInfo) {
-                // Since this runs on unmount/cleanup, we can't block navigation easily here,
-                // but we can ensure the user knows. 
-                // However, 'beforeRemove' listener is better for 'interception'.
-                // But in React Native, Alert inside cleanup might be too late or detached.
-                // Let's rely on an explicit effect that runs ONCE when we load with contact info.
                 Alert.alert(
                     'Complaint Resolved',
                     'Since you have viewed the contact details, we have marked this inquiry as resolved. If you did not recover your item, you can reopen it from your account.',
@@ -50,13 +45,10 @@ export default function Success() {
 
     const fetchUserComplaints = async () => {
         try {
-            // In a real app, we should have an endpoint to get complaints by userId
-            // For now, we fetch all and filter (not efficient but works for prototype)
-            // Or use the profile endpoint data if available in context
             const allComplaints = await getComplaints();
             const myOpenComplaints = allComplaints.filter(c =>
                 c.userId === user?.id &&
-                (c.status === 'OPEN' || !c.status) // Handle undefined status as open
+                (c.status === 'OPEN' || !c.status)
             );
             setUserComplaints(myOpenComplaints);
         } catch (error) {
@@ -74,6 +66,8 @@ export default function Success() {
                 return 'Payment Successful!';
             case 'verification':
                 return 'Identity Verified!';
+            case 'notified':
+                return 'Victim Notified!';
             default:
                 return 'Success!';
         }
@@ -91,6 +85,8 @@ export default function Success() {
                 return 'You can now contact the founder to collect your item.';
             case 'verification':
                 return 'Contact the founder to collect your item.';
+            case 'notified':
+                return 'We have securely notified the victim. They will review your report and contact you if it matches.';
             default:
                 return 'Your request has been completed successfully.';
         }
@@ -101,14 +97,12 @@ export default function Success() {
 
         setUpdating(true);
         try {
-            // 1. Update Item Status
             if (user?.id) {
                 await claimItem(params.itemId, user.id);
             } else {
-                await updateItemStatus(params.itemId, 'CLAIMED'); // Fallback if no user check
+                await updateItemStatus(params.itemId, 'CLAIMED');
             }
 
-            // 2. Check if there are open complaints to close
             if (userComplaints.length > 0) {
                 setShowComplaintModal(true);
             } else {
@@ -125,7 +119,6 @@ export default function Success() {
 
     const handleCloseComplaint = async () => {
         if (!selectedComplaintId) {
-            // User chose not to close any complaint or "Skip"
             router.push('/');
             return;
         }
@@ -139,6 +132,9 @@ export default function Success() {
             Alert.alert('Error', 'Failed to close complaint.');
         }
     };
+
+    // Determine whether to show the "Go Back" button
+    const showBackButton = params.type !== 'complaint' && params.type !== 'notified';
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
@@ -237,13 +233,15 @@ export default function Success() {
                         title="Go to Home"
                         onPress={() => router.push('/')}
                         style={{ marginBottom: 12 }}
-                        variant="outline"
+                        variant="primary"
                     />
-                    <Button
-                        title="Go Back"
-                        onPress={() => router.back()}
-                        variant="secondary"
-                    />
+                    {showBackButton && (
+                        <Button
+                            title="Go Back"
+                            onPress={() => router.back()}
+                            variant="secondary"
+                        />
+                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>

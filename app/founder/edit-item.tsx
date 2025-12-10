@@ -26,6 +26,7 @@ export default function EditFoundItem() {
         imageUris: [] as string[],
     });
     const [date, setDate] = useState(new Date());
+    const [itemStatus, setItemStatus] = useState<string>('OPEN');
 
     useEffect(() => {
         const fetchItem = async () => {
@@ -44,6 +45,7 @@ export default function EditFoundItem() {
                         imageUris: item.imageUris || (item.imageUri ? [item.imageUri] : []),
                     });
                     setDate(new Date(item.date));
+                    setItemStatus(item.status || 'OPEN');
                 } else {
                     Alert.alert('Error', 'Item not found');
                     router.back();
@@ -173,41 +175,52 @@ export default function EditFoundItem() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <Text style={[styles.heading, { color: colors.text }]}>Edit Reported Item</Text>
-                    <Text style={[styles.subHeader, { color: colors.textSecondary }]}>Update details, questions, or status.</Text>
+                    <Text style={[styles.heading, { color: colors.text }]}>
+                        {itemStatus === 'NOTIFIED' ? 'Edit Notification Details' : 'Edit Reported Item'}
+                    </Text>
+                    <Text style={[styles.subHeader, { color: colors.textSecondary }]}>
+                        {itemStatus === 'NOTIFIED'
+                            ? 'Update security questions, description, or contact info.'
+                            : 'Update details, questions, or status.'}
+                    </Text>
 
                     <View style={styles.form}>
-                        <CustomImagePicker
-                            label="Item Photos"
-                            onImagesSelected={(uris) => setForm({ ...form, imageUris: uris })}
-                            initialImages={form.imageUris}
-                        />
+                        {/* Only show these fields for OPEN items */}
+                        {itemStatus !== 'NOTIFIED' && (
+                            <>
+                                <CustomImagePicker
+                                    label="Item Photos"
+                                    onImagesSelected={(uris) => setForm({ ...form, imageUris: uris })}
+                                    initialImages={form.imageUris}
+                                />
 
-                        <Input
-                            label="Item Name"
-                            placeholder="e.g. Blue Car Keys"
-                            value={form.name}
-                            onChangeText={(text) => setForm({ ...form, name: text })}
-                        />
+                                <Input
+                                    label="Item Name"
+                                    placeholder="e.g. Blue Car Keys"
+                                    value={form.name}
+                                    onChangeText={(text) => setForm({ ...form, name: text })}
+                                />
 
-                        <CategoryPicker
-                            label="Category"
-                            value={form.category}
-                            onChange={(category) => setForm({ ...form, category })}
-                        />
+                                <CategoryPicker
+                                    label="Category"
+                                    value={form.category}
+                                    onChange={(category) => setForm({ ...form, category })}
+                                />
 
-                        <Input
-                            label="Location Found"
-                            placeholder="e.g. Central Park, near bench"
-                            value={form.location}
-                            onChangeText={(text) => setForm({ ...form, location: text })}
-                        />
+                                <Input
+                                    label="Location Found"
+                                    placeholder="e.g. Central Park, near bench"
+                                    value={form.location}
+                                    onChangeText={(text) => setForm({ ...form, location: text })}
+                                />
 
-                        <DatePicker
-                            label="Date Found"
-                            value={date}
-                            onChange={setDate}
-                        />
+                                <DatePicker
+                                    label="Date Found"
+                                    value={date}
+                                    onChange={setDate}
+                                />
+                            </>
+                        )}
 
                         <Input
                             label="Description"
