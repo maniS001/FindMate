@@ -124,13 +124,47 @@ export default function NotificationsScreen() {
             });
         };
 
+        // Determine notification type for founder notifications
+        const isFounderNotification = item.type === 'COMPLAINT_CLOSED' ||
+            item.type === 'COMPLAINT_REOPENED' ||
+            item.type === 'ITEM_RECOVERED';
+
+        const getIconColor = () => {
+            if (item.type === 'ITEM_RECOVERED' || isResolved) return '#10B981';
+            if (item.type === 'COMPLAINT_CLOSED') return '#F59E0B';
+            if (item.type === 'COMPLAINT_REOPENED') return colors.primary;
+            return colors.primary;
+        };
+
+        const getTypeBadge = () => {
+            switch (item.type) {
+                case 'ITEM_RECOVERED':
+                    return { text: '✓ RECOVERED', color: '#10B981' };
+                case 'COMPLAINT_CLOSED':
+                    return { text: 'CLOSED', color: '#F59E0B' };
+                case 'COMPLAINT_REOPENED':
+                    return { text: 'REOPENED', color: colors.primary };
+                default:
+                    return null;
+            }
+        };
+
+        const typeBadge = getTypeBadge();
+
         return (
             <View style={[styles.notificationItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={[styles.iconContainer, { backgroundColor: isResolved ? '#10B981' + '20' : colors.primary + '20' }]}>
-                    <Bell size={20} color={isResolved ? '#10B981' : colors.primary} />
+                <View style={[styles.iconContainer, { backgroundColor: getIconColor() + '20' }]}>
+                    <Bell size={20} color={getIconColor()} />
                 </View>
                 <View style={styles.contentContainer}>
-                    <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+                    <View style={styles.titleRow}>
+                        <Text style={[styles.title, { color: colors.text, flex: 1 }]} numberOfLines={1}>{item.title}</Text>
+                        {typeBadge && (
+                            <View style={[styles.typeBadge, { backgroundColor: typeBadge.color + '20' }]}>
+                                <Text style={[styles.typeBadgeText, { color: typeBadge.color }]}>{typeBadge.text}</Text>
+                            </View>
+                        )}
+                    </View>
                     <Text style={[styles.message, { color: colors.textSecondary }]}>{item.message}</Text>
                     <Text style={[styles.date, { color: colors.textSecondary }]}>
                         {new Date(item.createdAt).toLocaleDateString()}
@@ -330,5 +364,19 @@ const styles = StyleSheet.create({
     recoveredText: {
         fontWeight: '600',
         fontSize: 14,
+    },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    typeBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    typeBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
     },
 });

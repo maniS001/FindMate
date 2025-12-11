@@ -497,6 +497,29 @@ export default function AccountScreen() {
                             </View>
                         )}
 
+                        {/* Closed by Victim Sub-section */}
+                        {profile?.items?.filter((i: any) => i.status === 'CLOSED').length > 0 && (
+                            <View style={{ gap: 12 }}>
+                                <Text style={[styles.subSectionTitle, { color: colors.textSecondary }]}>Closed by Victim</Text>
+                                {profile?.items?.filter((i: any) => i.status === 'CLOSED').map((item: any) => (
+                                    <View key={item.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                        <View style={styles.historyIcon}>
+                                            <XCircle size={20} color="#F59E0B" />
+                                        </View>
+                                        <View style={styles.historyContent}>
+                                            <View style={styles.titleRow}>
+                                                <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
+                                                <View style={[styles.badge, { backgroundColor: '#F59E0B' + '20' }]}>
+                                                    <Text style={[styles.badgeText, { color: '#F59E0B' }]}>CLOSED</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
                         {/* Recovered/Claimed Items Sub-section */}
                         {profile?.items?.filter((i: any) => i.status === 'CLAIMED' || i.status === 'RECOVERED').length > 0 && (
                             <View style={{ gap: 12 }}>
@@ -516,11 +539,16 @@ export default function AccountScreen() {
                                                             <Star key={i} size={12} color="#F59E0B" fill="#F59E0B" />
                                                         ))}
                                                     </View>
+                                                    {item.feedbackComment && (
+                                                        <Text style={[styles.reasonText, { color: colors.textSecondary }]}>
+                                                            "{item.feedbackComment}"
+                                                        </Text>
+                                                    )}
                                                 </View>
                                             )}
                                         </View>
                                         <View style={[styles.badge, { backgroundColor: colors.success + '20' }]}>
-                                            <Text style={[styles.badgeText, { color: colors.success }]}>{item.status}</Text>
+                                            <Text style={[styles.badgeText, { color: colors.success }]}>✓ {item.status}</Text>
                                         </View>
                                     </View>
                                 ))}
