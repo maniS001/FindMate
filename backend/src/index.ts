@@ -128,7 +128,33 @@ app.get('/api/notifications', authenticateToken, async (req: any, res) => {
             where: { userId: req.user.id },
             orderBy: { createdAt: 'desc' },
         });
-        res.json(notifications);
+
+        // Enrich notifications with current complaint status
+        const enrichedNotifications = await Promise.all(
+            notifications.map(async (notification) => {
+                if (notification.type === 'CLAIM_REQUEST' && notification.payload) {
+                    try {
+                        const payload = JSON.parse(notification.payload);
+                        if (payload.complaintId) {
+                            const complaint = await prisma.complaint.findUnique({
+                                where: { id: payload.complaintId },
+                                select: { status: true }
+                            });
+                            payload.complaintStatus = complaint?.status || 'OPEN';
+                            return {
+                                ...notification,
+                                payload: JSON.stringify(payload)
+                            };
+                        }
+                    } catch (e) {
+                        console.error('Error enriching notification', e);
+                    }
+                }
+                return notification;
+            })
+        );
+
+        res.json(enrichedNotifications);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch notifications' });
     }

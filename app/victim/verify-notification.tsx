@@ -189,6 +189,7 @@ export default function VerifyNotificationScreen() {
                                             {index + 1}. {q.question}
                                         </Text>
                                         <Input
+                                            label={`Answer ${index + 1}`}
                                             placeholder="Your Answer"
                                             value={answers[index] || ''}
                                             onChangeText={(text) => handleAnswerChange(text, index)}
