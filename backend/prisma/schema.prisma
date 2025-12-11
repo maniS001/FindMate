@@ -63,6 +63,8 @@ model Complaint {
   closureReason String? // Added
   reopenReason  String? // Added
   resolvedAt    DateTime? // Added
+  feedbackRating  Int?
+  feedbackComment String?
   createdAt   DateTime @default(now())
   
   userId      String?

@@ -407,6 +407,61 @@ app.patch('/api/complaints/:id', async (req, res) => {
     }
 });
 
+// Resolve Complaint (with feedback) - Victim marks complaint as resolved
+app.post('/api/complaints/:id/resolve', authenticateToken, async (req: any, res) => {
+    try {
+        const { id } = req.params;
+        const { rating, comment } = req.body;
+
+        // Update complaint to RESOLVED with feedback
+        const complaint = await prisma.complaint.update({
+            where: { id },
+            data: {
+                status: 'RESOLVED',
+                resolvedAt: new Date(),
+                feedbackRating: rating,
+                feedbackComment: comment,
+                closureReason: 'Item recovered via FindMate'
+            },
+        });
+
+        // Find and update any linked items (from notifications) to RECOVERED
+        // Look for items that were created for this complaint (through notify flow)
+        const notifications = await prisma.notification.findMany({
+            where: {
+                userId: req.user.id,
+                type: 'CLAIM_REQUEST',
+            }
+        });
+
+        // Find notification with this complaint and update linked item
+        for (const notification of notifications) {
+            try {
+                const payload = JSON.parse(notification.payload || '{}');
+                if (payload.complaintId === id && payload.itemId) {
+                    await prisma.item.update({
+                        where: { id: payload.itemId },
+                        data: {
+                            status: 'RECOVERED',
+                            recoveredAt: new Date(),
+                            feedbackRating: rating,
+                            feedbackComment: comment,
+                        }
+                    });
+                    break;
+                }
+            } catch (e) {
+                console.error('Error parsing notification payload', e);
+            }
+        }
+
+        res.json({ success: true, complaint });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to resolve complaint' });
+    }
+});
+
 // Notify Owner (Founder -> Victim)
 app.post('/api/complaints/:id/notify', authenticateToken, async (req: any, res) => {
     try {

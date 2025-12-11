@@ -33,6 +33,7 @@ export default function AccountScreen() {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+    const [selectedComplaintIdForResolve, setSelectedComplaintIdForResolve] = useState<string | null>(null);
 
     useFocusEffect(
         useCallback(() => {
@@ -41,22 +42,26 @@ export default function AccountScreen() {
     );
 
     const fetchProfile = async () => {
+        if (!token) {
+            setLoading(false);
+            return;
+        }
         try {
             const response = await fetch(`${API_URL}/auth/me?_t=${Date.now()}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await response.json();
-            if (response.ok) {
-                setProfile(data);
-                if (data.id) {
-                    const claimed = await getClaimedItems(data.id);
-                    setClaimedItems(claimed);
-                }
-                if (token) {
-                    const notifs = await getNotifications(token);
-                    setNotifications(notifs);
-                }
+            setProfile(data);
+
+            // Fetch claimed items
+            if (user?.id) {
+                const items = await getClaimedItems(user.id);
+                setClaimedItems(items);
             }
+
+            // Fetch notifications
+            const notifs = await getNotifications(token);
+            setNotifications(notifs);
         } catch (error) {
             console.error('Failed to fetch profile', error);
         } finally {
@@ -98,19 +103,40 @@ export default function AccountScreen() {
 
     const handleMarkRecovered = (itemId: string) => {
         setSelectedItemId(itemId);
+        setSelectedComplaintIdForResolve(null);
+        setShowFeedbackModal(true);
+    };
+
+    const handleMarkComplaintResolved = (complaintId: string) => {
+        setSelectedComplaintIdForResolve(complaintId);
+        setSelectedItemId(null);
         setShowFeedbackModal(true);
     };
 
     const handleSubmitFeedback = async (rating: number, comment: string) => {
-        if (!selectedItemId) return;
         setActionLoading(true);
         try {
-            await recoverItem(selectedItemId, { rating, comment });
+            if (selectedItemId) {
+                // Item recovery flow (claimed item)
+                await recoverItem(selectedItemId, { rating, comment });
+            } else if (selectedComplaintIdForResolve) {
+                // Complaint resolution flow
+                // Update complaint to RESOLVED with feedback
+                const response = await fetch(`${API_URL}/complaints/${selectedComplaintIdForResolve}/resolve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ rating, comment }),
+                });
+                if (!response.ok) throw new Error('Failed to resolve complaint');
+            }
             await fetchProfile();
             setShowFeedbackModal(false);
-            Alert.alert('Success', 'Item marked as recovered and feedback submitted!');
+            Alert.alert('Success', 'Marked as resolved! Thank you for your feedback.');
         } catch (error) {
-            Alert.alert('Error', 'Failed to mark item as recovered.');
+            Alert.alert('Error', 'Failed to mark as resolved.');
         } finally {
             setActionLoading(false);
         }
@@ -211,13 +237,28 @@ export default function AccountScreen() {
 
                 {/* Action for Closed Complaints */}
                 {isClosed && (
-                    <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
-                        onPress={() => handleAction(complaint.id, 'REOPEN')}
-                    >
-                        <RefreshCw size={16} color={colors.primary} />
-                        <Text style={[styles.actionText, { color: colors.primary }]}>Raise Again</Text>
-                    </TouchableOpacity>
+                    complaint.status === 'RESOLVED' ? (
+                        <View style={[styles.badge, { backgroundColor: colors.success + '20' }]}>
+                            <Text style={[styles.badgeText, { color: colors.success }]}>✓ RESOLVED</Text>
+                        </View>
+                    ) : (
+                        <View style={{ gap: 8 }}>
+                            <TouchableOpacity
+                                style={[styles.actionButton, { backgroundColor: colors.success + '10' }]}
+                                onPress={() => handleMarkComplaintResolved(complaint.id)}
+                            >
+                                <CheckCircle size={16} color={colors.success} />
+                                <Text style={[styles.actionText, { color: colors.success }]}>Mark as Resolved</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
+                                onPress={() => handleAction(complaint.id, 'REOPEN')}
+                            >
+                                <RefreshCw size={16} color={colors.primary} />
+                                <Text style={[styles.actionText, { color: colors.primary }]}>Raise Again</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )
                 )}
             </View>
         );

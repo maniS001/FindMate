@@ -1,5 +1,5 @@
 import { usePathname, useRouter } from 'expo-router';
-import { ArrowLeft, Bell, Info, Menu, Moon, Settings, Sun, User } from 'lucide-react-native';
+import { ArrowLeft, Bell, Info, Menu, Settings, User } from 'lucide-react-native';
 import { useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,12 +14,11 @@ interface MenuItem {
 export default function Header() {
     const router = useRouter();
     const pathname = usePathname();
-    const { theme, toggleTheme, colors } = useTheme();
+    const { colors } = useTheme();
     const [menuVisible, setMenuVisible] = useState(false);
 
     const menuItems: MenuItem[] = [
         { icon: <User size={20} color={colors.text} />, label: 'Account Details', route: '/account' },
-        { icon: <Bell size={20} color={colors.text} />, label: 'Notifications', route: '/notifications' },
         { icon: <Settings size={20} color={colors.text} />, label: 'Settings', route: '/settings' },
         { icon: <Info size={20} color={colors.text} />, label: 'About Us', route: '/about' },
     ];
@@ -80,17 +79,17 @@ export default function Header() {
                         </TouchableOpacity>
                     )}
 
-                    {/* Theme Toggle */}
+                    {/* Notification Button */}
                     <TouchableOpacity
-                        onPress={toggleTheme}
+                        onPress={() => {
+                            if (pathname !== '/notifications') {
+                                router.push('/notifications' as never);
+                            }
+                        }}
                         style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
                         activeOpacity={0.7}
                     >
-                        {theme === 'light' ? (
-                            <Moon size={20} color={colors.headerText} />
-                        ) : (
-                            <Sun size={20} color={colors.headerText} />
-                        )}
+                        <Bell size={20} color={colors.headerText} />
                     </TouchableOpacity>
 
                     {/* Menu Button */}
