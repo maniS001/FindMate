@@ -408,8 +408,8 @@ app.patch('/api/complaints/:id', async (req, res) => {
             data,
         });
 
-        // If status changed from NOTIFIED to CLOSED, notify the founder
-        if (previousStatus === 'NOTIFIED' && status === 'CLOSED') {
+        // If status changed to CLOSED, check if there's a linked notification and notify the founder
+        if (status === 'CLOSED' && previousStatus !== 'CLOSED') {
             // Find the notification that has this complaint to get the founder's item
             const victimNotifications = await prisma.notification.findMany({
                 where: {
@@ -418,18 +418,23 @@ app.patch('/api/complaints/:id', async (req, res) => {
                 }
             });
 
+            console.log(`Looking for notifications for complaint ${id}, found ${victimNotifications.length}`);
+
             for (const notification of victimNotifications) {
                 try {
                     const payload = JSON.parse(notification.payload || '{}');
+                    console.log(`Checking notification payload:`, payload);
                     if (payload.complaintId === id && payload.itemId) {
                         // Get the item to find founder
                         const item = await prisma.item.findUnique({ where: { id: payload.itemId } });
+                        console.log(`Found item:`, item?.id, item?.status);
                         if (item && item.userId) {
                             // Update item status to CLOSED
                             await prisma.item.update({
                                 where: { id: payload.itemId },
                                 data: { status: 'CLOSED' }
                             });
+                            console.log(`Updated item ${payload.itemId} status to CLOSED`);
 
                             // Notify founder that victim closed the complaint
                             await prisma.notification.create({
@@ -441,6 +446,7 @@ app.patch('/api/complaints/:id', async (req, res) => {
                                     payload: JSON.stringify({ complaintId: id, itemId: payload.itemId, reason: closureReason }),
                                 }
                             });
+                            console.log(`Created notification for founder ${item.userId}`);
                         }
                         break;
                     }
@@ -450,8 +456,8 @@ app.patch('/api/complaints/:id', async (req, res) => {
             }
         }
 
-        // If reopening a complaint (CLOSED -> OPEN), notify founder if there was a previous notification
-        if ((previousStatus === 'CLOSED' || previousStatus === 'NOTIFIED') && status === 'OPEN') {
+        // If reopening a complaint (any status -> OPEN), notify founder if there was a previous notification
+        if (status === 'OPEN' && previousStatus !== 'OPEN') {
             const victimNotifications = await prisma.notification.findMany({
                 where: {
                     userId: currentComplaint.userId || undefined,
@@ -459,17 +465,21 @@ app.patch('/api/complaints/:id', async (req, res) => {
                 }
             });
 
+            console.log(`Looking for notifications for reopening complaint ${id}, found ${victimNotifications.length}`);
+
             for (const notification of victimNotifications) {
                 try {
                     const payload = JSON.parse(notification.payload || '{}');
                     if (payload.complaintId === id && payload.itemId) {
                         const item = await prisma.item.findUnique({ where: { id: payload.itemId } });
+                        console.log(`Found item for reopen:`, item?.id, item?.status);
                         if (item && item.userId) {
                             // Update item status back to NOTIFIED
                             await prisma.item.update({
                                 where: { id: payload.itemId },
                                 data: { status: 'NOTIFIED' }
                             });
+                            console.log(`Updated item ${payload.itemId} status to NOTIFIED (reopened)`);
 
                             // Notify founder that victim reopened the complaint
                             await prisma.notification.create({
@@ -481,6 +491,7 @@ app.patch('/api/complaints/:id', async (req, res) => {
                                     payload: JSON.stringify({ complaintId: id, itemId: payload.itemId, reason: reopenReason }),
                                 }
                             });
+                            console.log(`Created reopen notification for founder ${item.userId}`);
                         }
                         break;
                     }
