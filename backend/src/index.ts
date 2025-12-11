@@ -375,12 +375,19 @@ app.patch('/api/items/:id', async (req, res) => {
     }
 });
 
-// Update Complaint Status
+// Update Complaint Status (with founder notification)
 app.patch('/api/complaints/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { status, closureReason, reopenReason, resolvedAt, name, category, location, date, description, contactInfo, imageUris } = req.body;
 
+        // Get the current complaint to check if status is changing
+        const currentComplaint = await prisma.complaint.findUnique({ where: { id } });
+        if (!currentComplaint) {
+            return res.status(404).json({ error: 'Complaint not found' });
+        }
+
+        const previousStatus = currentComplaint.status;
         const data: any = {};
         if (status) data.status = status;
         if (closureReason) data.closureReason = closureReason;
@@ -400,6 +407,89 @@ app.patch('/api/complaints/:id', async (req, res) => {
             where: { id },
             data,
         });
+
+        // If status changed from NOTIFIED to CLOSED, notify the founder
+        if (previousStatus === 'NOTIFIED' && status === 'CLOSED') {
+            // Find the notification that has this complaint to get the founder's item
+            const victimNotifications = await prisma.notification.findMany({
+                where: {
+                    userId: currentComplaint.userId || undefined,
+                    type: 'CLAIM_REQUEST'
+                }
+            });
+
+            for (const notification of victimNotifications) {
+                try {
+                    const payload = JSON.parse(notification.payload || '{}');
+                    if (payload.complaintId === id && payload.itemId) {
+                        // Get the item to find founder
+                        const item = await prisma.item.findUnique({ where: { id: payload.itemId } });
+                        if (item && item.userId) {
+                            // Update item status to CLOSED
+                            await prisma.item.update({
+                                where: { id: payload.itemId },
+                                data: { status: 'CLOSED' }
+                            });
+
+                            // Notify founder that victim closed the complaint
+                            await prisma.notification.create({
+                                data: {
+                                    userId: item.userId,
+                                    title: 'Complaint Closed by Victim',
+                                    message: `The victim has closed their complaint "${currentComplaint.name}". Reason: ${closureReason || 'No reason provided'}`,
+                                    type: 'COMPLAINT_CLOSED',
+                                    payload: JSON.stringify({ complaintId: id, itemId: payload.itemId, reason: closureReason }),
+                                }
+                            });
+                        }
+                        break;
+                    }
+                } catch (e) {
+                    console.error('Error processing notification', e);
+                }
+            }
+        }
+
+        // If reopening a complaint (CLOSED -> OPEN), notify founder if there was a previous notification
+        if ((previousStatus === 'CLOSED' || previousStatus === 'NOTIFIED') && status === 'OPEN') {
+            const victimNotifications = await prisma.notification.findMany({
+                where: {
+                    userId: currentComplaint.userId || undefined,
+                    type: 'CLAIM_REQUEST'
+                }
+            });
+
+            for (const notification of victimNotifications) {
+                try {
+                    const payload = JSON.parse(notification.payload || '{}');
+                    if (payload.complaintId === id && payload.itemId) {
+                        const item = await prisma.item.findUnique({ where: { id: payload.itemId } });
+                        if (item && item.userId) {
+                            // Update item status back to NOTIFIED
+                            await prisma.item.update({
+                                where: { id: payload.itemId },
+                                data: { status: 'NOTIFIED' }
+                            });
+
+                            // Notify founder that victim reopened the complaint
+                            await prisma.notification.create({
+                                data: {
+                                    userId: item.userId,
+                                    title: 'Complaint Reopened',
+                                    message: `The victim has reopened their complaint "${currentComplaint.name}". ${reopenReason || ''}`,
+                                    type: 'COMPLAINT_REOPENED',
+                                    payload: JSON.stringify({ complaintId: id, itemId: payload.itemId, reason: reopenReason }),
+                                }
+                            });
+                        }
+                        break;
+                    }
+                } catch (e) {
+                    console.error('Error processing notification', e);
+                }
+            }
+        }
+
         res.json(complaint);
     } catch (error) {
         console.error(error);
@@ -426,7 +516,6 @@ app.post('/api/complaints/:id/resolve', authenticateToken, async (req: any, res)
         });
 
         // Find and update any linked items (from notifications) to RECOVERED
-        // Look for items that were created for this complaint (through notify flow)
         const notifications = await prisma.notification.findMany({
             where: {
                 userId: req.user.id,
@@ -439,6 +528,9 @@ app.post('/api/complaints/:id/resolve', authenticateToken, async (req: any, res)
             try {
                 const payload = JSON.parse(notification.payload || '{}');
                 if (payload.complaintId === id && payload.itemId) {
+                    const item = await prisma.item.findUnique({ where: { id: payload.itemId } });
+
+                    // Update item to RECOVERED
                     await prisma.item.update({
                         where: { id: payload.itemId },
                         data: {
@@ -448,6 +540,21 @@ app.post('/api/complaints/:id/resolve', authenticateToken, async (req: any, res)
                             feedbackComment: comment,
                         }
                     });
+
+                    // Notify founder about successful recovery
+                    if (item && item.userId) {
+                        await prisma.notification.create({
+                            data: {
+                                userId: item.userId,
+                                title: 'Item Successfully Recovered! 🎉',
+                                message: `The victim has confirmed recovering "${complaint.name}". Thank you for helping!` +
+                                    (rating ? ` Rating: ${rating}/5` : '') +
+                                    (comment ? ` Feedback: "${comment}"` : ''),
+                                type: 'ITEM_RECOVERED',
+                                payload: JSON.stringify({ complaintId: id, itemId: payload.itemId, rating, comment }),
+                            }
+                        });
+                    }
                     break;
                 }
             } catch (e) {

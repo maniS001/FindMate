@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell } from 'lucide-react-native';
+import { ArrowLeft, Bell, CheckCircle, RefreshCw } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import FeedbackModal from '../components/FeedbackModal';
 import { API_URL } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -23,6 +24,9 @@ export default function NotificationsScreen() {
     const { token } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchNotifications();
@@ -44,6 +48,58 @@ export default function NotificationsScreen() {
         }
     };
 
+    const handleMarkResolved = (complaintId: string) => {
+        setSelectedComplaintId(complaintId);
+        setShowFeedbackModal(true);
+    };
+
+    const handleSubmitFeedback = async (rating: number, comment: string) => {
+        if (!selectedComplaintId) return;
+        setActionLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/complaints/${selectedComplaintId}/resolve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ rating, comment }),
+            });
+            if (!response.ok) throw new Error('Failed to resolve');
+            setShowFeedbackModal(false);
+            Alert.alert('Success', 'Marked as resolved! Thank you for your feedback.');
+            fetchNotifications(); // Refresh to update status
+        } catch (error) {
+            Alert.alert('Error', 'Failed to mark as resolved.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleRaiseAgain = async (complaintId: string) => {
+        setActionLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/complaints/${complaintId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    status: 'OPEN',
+                    reopenReason: 'Reopened by victim from notifications'
+                }),
+            });
+            if (!response.ok) throw new Error('Failed to reopen');
+            Alert.alert('Success', 'Complaint reopened successfully.');
+            fetchNotifications(); // Refresh to update status
+        } catch (error) {
+            Alert.alert('Error', 'Failed to reopen complaint.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const renderItem = ({ item }: { item: Notification }) => {
         let payload: any = {};
         try {
@@ -53,10 +109,10 @@ export default function NotificationsScreen() {
         }
 
         const isClaimRequest = item.type === 'CLAIM_REQUEST';
-
-        // Check if the related complaint is already resolved/closed
         const complaintStatus = payload.complaintStatus;
-        const isResolved = complaintStatus === 'RESOLVED' || complaintStatus === 'CLOSED';
+        const isResolved = complaintStatus === 'RESOLVED';
+        const isClosed = complaintStatus === 'CLOSED';
+        const isOpen = complaintStatus === 'OPEN' || complaintStatus === 'NOTIFIED' || !complaintStatus;
 
         const handleClaim = () => {
             router.push({
@@ -79,19 +135,44 @@ export default function NotificationsScreen() {
                     <Text style={[styles.date, { color: colors.textSecondary }]}>
                         {new Date(item.createdAt).toLocaleDateString()}
                     </Text>
+
                     {isClaimRequest && (
-                        isResolved ? (
-                            <View style={[styles.recoveredBadge, { backgroundColor: '#10B981' + '20' }]}>
-                                <Text style={[styles.recoveredText, { color: '#10B981' }]}>✓ Recovered</Text>
-                            </View>
-                        ) : (
-                            <TouchableOpacity
-                                style={[styles.claimButton, { backgroundColor: colors.primary }]}
-                                onPress={handleClaim}
-                            >
-                                <Text style={styles.claimButtonText}>Verify & Claim</Text>
-                            </TouchableOpacity>
-                        )
+                        <View style={styles.actionsContainer}>
+                            {isResolved ? (
+                                // Already resolved - show badge
+                                <View style={[styles.recoveredBadge, { backgroundColor: '#10B981' + '20' }]}>
+                                    <Text style={[styles.recoveredText, { color: '#10B981' }]}>✓ Recovered</Text>
+                                </View>
+                            ) : isClosed ? (
+                                // Closed but not resolved - show Mark as Resolved and Raise Again
+                                <View style={styles.buttonRow}>
+                                    <TouchableOpacity
+                                        style={[styles.actionButton, { backgroundColor: '#10B981' }]}
+                                        onPress={() => handleMarkResolved(payload.complaintId)}
+                                        disabled={actionLoading}
+                                    >
+                                        <CheckCircle size={14} color="#FFF" />
+                                        <Text style={styles.actionButtonText}>Mark Resolved</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                                        onPress={() => handleRaiseAgain(payload.complaintId)}
+                                        disabled={actionLoading}
+                                    >
+                                        <RefreshCw size={14} color="#FFF" />
+                                        <Text style={styles.actionButtonText}>Raise Again</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                // Open/Notified - show Verify & Claim
+                                <TouchableOpacity
+                                    style={[styles.claimButton, { backgroundColor: colors.primary }]}
+                                    onPress={handleClaim}
+                                >
+                                    <Text style={styles.claimButtonText}>Verify & Claim</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
                     )}
                 </View>
                 {!item.read && (
@@ -103,6 +184,13 @@ export default function NotificationsScreen() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <FeedbackModal
+                visible={showFeedbackModal}
+                onClose={() => setShowFeedbackModal(false)}
+                onSubmit={handleSubmitFeedback}
+                loading={actionLoading}
+            />
+
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <ArrowLeft size={24} color={colors.text} />
@@ -170,8 +258,7 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 12,
         borderWidth: 1,
-        gap: 16,
-        alignItems: 'flex-start',
+        marginBottom: 12,
     },
     iconContainer: {
         width: 40,
@@ -182,6 +269,7 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         flex: 1,
+        marginLeft: 12,
         gap: 4,
     },
     title: {
@@ -196,6 +284,26 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 4,
     },
+    actionsContainer: {
+        marginTop: 12,
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    actionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        gap: 6,
+    },
+    actionButtonText: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+        fontSize: 13,
+    },
     dot: {
         width: 8,
         height: 8,
@@ -207,7 +315,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 8,
-        marginTop: 8,
     },
     claimButtonText: {
         color: '#FFFFFF',
@@ -219,7 +326,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 8,
-        marginTop: 8,
     },
     recoveredText: {
         fontWeight: '600',
