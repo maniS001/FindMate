@@ -84,7 +84,7 @@ export default function VerifyNotificationScreen() {
                 // Auto-close the complaint if it's correct
                 if (complaintId) {
                     try {
-                        await updateComplaintStatus(complaintId, 'RESOLVED', 'Founder contacted via Notification');
+                        await updateComplaintStatus(complaintId, 'CLOSED', 'Founder contacted via Notification');
                     } catch (error) {
                         console.error('Failed to auto-close complaint', error);
                     }

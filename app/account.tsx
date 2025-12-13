@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ArrowLeft, Bell, CheckCircle, Edit2, FileText, LogOut, Package, RefreshCw, Star, XCircle } from 'lucide-react-native';
+import { AlertCircle, ArrowLeft, Bell, CheckCircle, Edit2, FileText, LogOut, Package, RefreshCw, Star, XCircle } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -244,6 +244,14 @@ export default function AccountScreen() {
                     ) : (
                         <View style={{ gap: 8 }}>
                             <TouchableOpacity
+                                style={[styles.actionButton, { backgroundColor: colors.success + '10' }]}
+                                onPress={() => handleMarkComplaintResolved(complaint.id)}
+                            >
+                                <CheckCircle size={16} color={colors.success} />
+                                <Text style={[styles.actionText, { color: colors.success }]}>Mark Resolved</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
                                 style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
                                 onPress={() => handleAction(complaint.id, 'REOPEN')}
                             >
@@ -464,53 +472,71 @@ export default function AccountScreen() {
                             <View style={{ gap: 12 }}>
                                 <Text style={[styles.subSectionTitle, { color: colors.textSecondary }]}>Notified Matches</Text>
                                 {profile?.items?.filter((i: any) => i.status === 'NOTIFIED' || i.status === 'REOPENED').map((item: any) => (
-                                    <View key={item.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                                        <View style={styles.historyIcon}>
-                                            <Bell size={20} color={colors.primary} />
-                                        </View>
-                                        <View style={styles.historyContent}>
-                                            <View style={styles.titleRow}>
-                                                <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
-                                                <View style={[styles.badge, { backgroundColor: (item.status === 'REOPENED' ? colors.error : colors.primary) + '20' }]}>
-                                                    <Text style={[styles.badgeText, { color: item.status === 'REOPENED' ? colors.error : colors.primary }]}>{item.status}</Text>
+                                    item.status === 'REOPENED' ? (
+                                        <View key={item.id} style={[styles.historyItem, { flexDirection: 'column', alignItems: 'stretch', borderColor: colors.error + '40', backgroundColor: colors.error + '05', borderLeftWidth: 4, borderLeftColor: colors.error }]}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                <View style={[styles.historyIcon, { backgroundColor: colors.error + '10' }]}>
+                                                    <AlertCircle size={20} color={colors.error} />
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
+                                                        <View style={[styles.badge, { backgroundColor: colors.error + '20' }]}>
+                                                            <Text style={[styles.badgeText, { color: colors.error }]}>REOPENED</Text>
+                                                        </View>
+                                                    </View>
+                                                    <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
                                                 </View>
                                             </View>
-                                            <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
-
-                                            {item.status === 'REOPENED' && (
-                                                <View style={{ marginTop: 4 }}>
-                                                    <Text style={[styles.reasonText, { color: colors.error, fontWeight: 'bold' }]}>
-                                                        ! Victim raised again
-                                                    </Text>
-                                                    {item.reopenReason && (
-                                                        <Text style={[styles.reasonText, { color: colors.textSecondary, fontSize: 12 }]}>
-                                                            "{item.reopenReason}"
-                                                        </Text>
-                                                    )}
-                                                </View>
-                                            )}
-                                        </View>
-
-                                        <View style={{ gap: 8 }}>
-                                            <TouchableOpacity
-                                                style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
-                                                onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
-                                            >
-                                                <Edit2 size={16} color={colors.primary} />
-                                                <Text style={[styles.actionText, { color: colors.primary }]}>Edit Details</Text>
-                                            </TouchableOpacity>
-
-                                            {item.status === 'REOPENED' && item.linkedComplaintId && (
+                                            <View style={{ backgroundColor: colors.surface, padding: 12, borderRadius: 8, marginTop: 12, borderWidth: 1, borderColor: colors.border }}>
+                                                <Text style={{ color: colors.error, fontWeight: '700', marginBottom: 4, fontSize: 12 }}>! VICTIM RAISED AGAIN</Text>
+                                                <Text style={{ color: colors.textSecondary, fontSize: 13, fontStyle: 'italic' }}>
+                                                    "{item.reopenReason || 'No reason provided'}"
+                                                </Text>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
                                                 <TouchableOpacity
-                                                    style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                                                    onPress={() => router.push({ pathname: '/founder/complaint-detail', params: { id: item.linkedComplaintId } })}
+                                                    style={[styles.actionButton, { flex: 1, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary + '40' }]}
+                                                    onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
                                                 >
-                                                    <Bell size={16} color="#FFF" />
-                                                    <Text style={[styles.actionText, { color: '#FFF' }]}>Update & Notify Again</Text>
+                                                    <Text style={[styles.actionText, { color: colors.primary }]}>Edit Item</Text>
                                                 </TouchableOpacity>
-                                            )}
+                                                {item.linkedComplaintId && (
+                                                    <TouchableOpacity
+                                                        style={[styles.actionButton, { flex: 1.5, justifyContent: 'center', backgroundColor: colors.primary }]}
+                                                        onPress={() => router.push({ pathname: '/founder/complaint-detail', params: { id: item.linkedComplaintId } })}
+                                                    >
+                                                        <Bell size={16} color="#FFF" />
+                                                        <Text style={[styles.actionText, { color: '#FFF' }]}>Update & Notify</Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
                                         </View>
-                                    </View>
+                                    ) : (
+                                        <View key={item.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                            <View style={styles.historyIcon}>
+                                                <Bell size={20} color={colors.primary} />
+                                            </View>
+                                            <View style={styles.historyContent}>
+                                                <View style={styles.titleRow}>
+                                                    <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
+                                                    <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
+                                                        <Text style={[styles.badgeText, { color: colors.primary }]}>NOTIFIED</Text>
+                                                    </View>
+                                                </View>
+                                                <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                                            </View>
+                                            <View style={{ gap: 8 }}>
+                                                <TouchableOpacity
+                                                    style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
+                                                    onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
+                                                >
+                                                    <Edit2 size={16} color={colors.primary} />
+                                                    <Text style={[styles.actionText, { color: colors.primary }]}>Edit Details</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    )
                                 ))}
                             </View>
                         )}
@@ -565,8 +591,17 @@ export default function AccountScreen() {
                                                 </View>
                                             )}
                                         </View>
-                                        <View style={[styles.badge, { backgroundColor: colors.success + '20' }]}>
-                                            <Text style={[styles.badgeText, { color: colors.success }]}>✓ {item.status}</Text>
+                                        <View style={{ gap: 8, alignItems: 'flex-end' }}>
+                                            <View style={[styles.badge, { backgroundColor: colors.success + '20' }]}>
+                                                <Text style={[styles.badgeText, { color: colors.success }]}>✓ {item.status}</Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
+                                                onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
+                                            >
+                                                <Edit2 size={16} color={colors.primary} />
+                                                <Text style={[styles.actionText, { color: colors.primary }]}>Edit</Text>
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
                                 ))}
