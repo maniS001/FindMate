@@ -595,13 +595,15 @@ export default function AccountScreen() {
                                             <View style={[styles.badge, { backgroundColor: colors.success + '20' }]}>
                                                 <Text style={[styles.badgeText, { color: colors.success }]}>✓ {item.status}</Text>
                                             </View>
-                                            <TouchableOpacity
-                                                style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
-                                                onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
-                                            >
-                                                <Edit2 size={16} color={colors.primary} />
-                                                <Text style={[styles.actionText, { color: colors.primary }]}>Edit</Text>
-                                            </TouchableOpacity>
+                                            {item.status === 'CLAIMED' && (
+                                                <TouchableOpacity
+                                                    style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
+                                                    onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
+                                                >
+                                                    <Edit2 size={16} color={colors.primary} />
+                                                    <Text style={[styles.actionText, { color: colors.primary }]}>Edit</Text>
+                                                </TouchableOpacity>
+                                            )}
                                         </View>
                                     </View>
                                 ))}

@@ -255,7 +255,7 @@ app.get('/api/items', async (req, res) => {
         }
 
         if (excludeClaimed === 'true') {
-            where.status = { in: ['OPEN', 'NOTIFIED'] };
+            where.status = { in: ['OPEN', 'REOPENED'] };
         }
 
         const items = await prisma.item.findMany({
@@ -432,9 +432,9 @@ app.patch('/api/complaints/:id', async (req, res) => {
                             // Update item status to CLOSED
                             await prisma.item.update({
                                 where: { id: payload.itemId },
-                                data: { status: 'CLOSED' }
+                                data: { status: 'CLAIMED' }
                             });
-                            console.log(`Updated item ${payload.itemId} status to CLOSED`);
+                            console.log(`Updated item ${payload.itemId} status to CLAIMED`);
 
                             // Notify founder that victim closed the complaint
                             await prisma.notification.create({
