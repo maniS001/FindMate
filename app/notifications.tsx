@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell, CheckCircle, RefreshCw } from 'lucide-react-native';
+import { ArrowLeft, Bell, RefreshCw } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -178,16 +178,8 @@ export default function NotificationsScreen() {
                                     <Text style={[styles.recoveredText, { color: '#10B981' }]}>✓ Recovered</Text>
                                 </View>
                             ) : isClosed ? (
-                                // Closed but not resolved - show Mark as Resolved and Raise Again
+                                // Closed but not resolved - show only Raise Again
                                 <View style={styles.buttonRow}>
-                                    <TouchableOpacity
-                                        style={[styles.actionButton, { backgroundColor: '#10B981' }]}
-                                        onPress={() => handleMarkResolved(payload.complaintId)}
-                                        disabled={actionLoading}
-                                    >
-                                        <CheckCircle size={14} color="#FFF" />
-                                        <Text style={styles.actionButtonText}>Mark Resolved</Text>
-                                    </TouchableOpacity>
                                     <TouchableOpacity
                                         style={[styles.actionButton, { backgroundColor: colors.primary }]}
                                         onPress={() => handleRaiseAgain(payload.complaintId)}

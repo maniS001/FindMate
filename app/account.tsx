@@ -244,13 +244,6 @@ export default function AccountScreen() {
                     ) : (
                         <View style={{ gap: 8 }}>
                             <TouchableOpacity
-                                style={[styles.actionButton, { backgroundColor: colors.success + '10' }]}
-                                onPress={() => handleMarkComplaintResolved(complaint.id)}
-                            >
-                                <CheckCircle size={16} color={colors.success} />
-                                <Text style={[styles.actionText, { color: colors.success }]}>Mark as Resolved</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
                                 style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
                                 onPress={() => handleAction(complaint.id, 'REOPEN')}
                             >
@@ -466,11 +459,11 @@ export default function AccountScreen() {
                             </View>
                         )}
 
-                        {/* Notified Matches Sub-section */}
-                        {profile?.items?.filter((i: any) => i.status === 'NOTIFIED').length > 0 && (
+                        {/* Notified Matches & Reopened Sub-section */}
+                        {profile?.items?.filter((i: any) => i.status === 'NOTIFIED' || i.status === 'REOPENED').length > 0 && (
                             <View style={{ gap: 12 }}>
                                 <Text style={[styles.subSectionTitle, { color: colors.textSecondary }]}>Notified Matches</Text>
-                                {profile?.items?.filter((i: any) => i.status === 'NOTIFIED').map((item: any) => (
+                                {profile?.items?.filter((i: any) => i.status === 'NOTIFIED' || i.status === 'REOPENED').map((item: any) => (
                                     <View key={item.id} style={[styles.historyItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                         <View style={styles.historyIcon}>
                                             <Bell size={20} color={colors.primary} />
@@ -478,20 +471,45 @@ export default function AccountScreen() {
                                         <View style={styles.historyContent}>
                                             <View style={styles.titleRow}>
                                                 <Text style={[styles.historyTitle, { color: colors.text }]}>{item.name}</Text>
-                                                <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                                                    <Text style={[styles.badgeText, { color: colors.primary }]}>NOTIFIED</Text>
+                                                <View style={[styles.badge, { backgroundColor: (item.status === 'REOPENED' ? colors.error : colors.primary) + '20' }]}>
+                                                    <Text style={[styles.badgeText, { color: item.status === 'REOPENED' ? colors.error : colors.primary }]}>{item.status}</Text>
                                                 </View>
                                             </View>
                                             <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{item.date}</Text>
+
+                                            {item.status === 'REOPENED' && (
+                                                <View style={{ marginTop: 4 }}>
+                                                    <Text style={[styles.reasonText, { color: colors.error, fontWeight: 'bold' }]}>
+                                                        ! Victim raised again
+                                                    </Text>
+                                                    {item.reopenReason && (
+                                                        <Text style={[styles.reasonText, { color: colors.textSecondary, fontSize: 12 }]}>
+                                                            "{item.reopenReason}"
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            )}
                                         </View>
 
-                                        <TouchableOpacity
-                                            style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
-                                            onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
-                                        >
-                                            <Edit2 size={16} color={colors.primary} />
-                                            <Text style={[styles.actionText, { color: colors.primary }]}>Edit Details</Text>
-                                        </TouchableOpacity>
+                                        <View style={{ gap: 8 }}>
+                                            <TouchableOpacity
+                                                style={[styles.actionButton, { backgroundColor: colors.primary + '10' }]}
+                                                onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
+                                            >
+                                                <Edit2 size={16} color={colors.primary} />
+                                                <Text style={[styles.actionText, { color: colors.primary }]}>Edit Details</Text>
+                                            </TouchableOpacity>
+
+                                            {item.status === 'REOPENED' && item.linkedComplaintId && (
+                                                <TouchableOpacity
+                                                    style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                                                    onPress={() => router.push({ pathname: '/founder/complaint-detail', params: { id: item.linkedComplaintId } })}
+                                                >
+                                                    <Bell size={16} color="#FFF" />
+                                                    <Text style={[styles.actionText, { color: '#FFF' }]}>Update & Notify Again</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
                                     </View>
                                 ))}
                             </View>

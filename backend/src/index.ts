@@ -474,12 +474,16 @@ app.patch('/api/complaints/:id', async (req, res) => {
                         const item = await prisma.item.findUnique({ where: { id: payload.itemId } });
                         console.log(`Found item for reopen:`, item?.id, item?.status);
                         if (item && item.userId) {
-                            // Update item status back to NOTIFIED
+                            // Update item status to REOPENED
                             await prisma.item.update({
                                 where: { id: payload.itemId },
-                                data: { status: 'NOTIFIED' }
+                                data: {
+                                    status: 'REOPENED',
+                                    reopenReason: reopenReason,
+                                    linkedComplaintId: id
+                                }
                             });
-                            console.log(`Updated item ${payload.itemId} status to NOTIFIED (reopened)`);
+                            console.log(`Updated item ${payload.itemId} status to REOPENED`);
 
                             // Notify founder that victim reopened the complaint
                             await prisma.notification.create({
@@ -596,7 +600,20 @@ app.post('/api/complaints/:id/notify', authenticateToken, async (req: any, res) 
         }
 
         // Handle Item Linking or Creation
+        // Handle Item Linking or Creation
         let finalItemId = itemId;
+
+        // If no confirmed itemId, try to find an existing item for this complaint linkage
+        if (!finalItemId) {
+            const existingItem = await prisma.item.findFirst({
+                where: {
+                    userId: founderUserId,
+                    linkedComplaintId: id
+                }
+            });
+            if (existingItem) finalItemId = existingItem.id;
+        }
+
         if (!finalItemId) {
             // Create a "Shadow Item" to track this notification
             const newItem = await prisma.item.create({
@@ -610,6 +627,7 @@ app.post('/api/complaints/:id/notify', authenticateToken, async (req: any, res) 
                     imageUris: [],
                     userId: founderUserId,
                     status: 'NOTIFIED',
+                    linkedComplaintId: id,
                     questions: {
                         create: questions ? questions.map((q: any) => ({
                             question: q.question,
@@ -623,28 +641,68 @@ app.post('/api/complaints/:id/notify', authenticateToken, async (req: any, res) 
             // Update existing item status
             await prisma.item.update({
                 where: { id: finalItemId },
-                data: { status: 'NOTIFIED' }
+                data: {
+                    status: 'NOTIFIED',
+                    linkedComplaintId: id
+                }
             });
         }
 
-        // Create notification for the victim
-        console.log('Creating notification for user:', complaint.userId, { id, phone });
-        const notification = await prisma.notification.create({
-            data: {
+        // Create or Update notification for the victim
+        console.log('Processing notification for user:', complaint.userId, { id, phone });
+
+        const existingNotification = await prisma.notification.findFirst({
+            where: {
                 userId: complaint.userId,
-                title: 'Someone found your item!',
-                message: `A founder has reached out regarding '${complaint.name}'.`,
                 type: 'CLAIM_REQUEST',
-                payload: JSON.stringify({
-                    complaintId: id,
-                    founderPhone: phone,
-                    questions,
-                    description,
-                    itemId: finalItemId
-                }),
-            },
+            }
         });
-        console.log('Notification created:', notification);
+
+        // Check if the existing notification is for the same complaint/item
+        let notificationToUpdate = null;
+        if (existingNotification) {
+            const payload = JSON.parse(existingNotification.payload || '{}');
+            if (payload.complaintId === id && payload.itemId === finalItemId) {
+                notificationToUpdate = existingNotification;
+            }
+        }
+
+        if (notificationToUpdate) {
+            await prisma.notification.update({
+                where: { id: notificationToUpdate.id },
+                data: {
+                    title: 'Item Match Update',
+                    message: `The founder has updated their message regarding '${complaint.name}'.`,
+                    read: false, // Mark as unread so they see it
+                    createdAt: new Date(), // Bump to top
+                    payload: JSON.stringify({
+                        complaintId: id,
+                        founderPhone: phone,
+                        questions,
+                        description,
+                        itemId: finalItemId
+                    }),
+                }
+            });
+            console.log('Notification updated');
+        } else {
+            const notification = await prisma.notification.create({
+                data: {
+                    userId: complaint.userId,
+                    title: 'Someone found your item!',
+                    message: `A founder has reached out regarding '${complaint.name}'.`,
+                    type: 'CLAIM_REQUEST',
+                    payload: JSON.stringify({
+                        complaintId: id,
+                        founderPhone: phone,
+                        questions,
+                        description,
+                        itemId: finalItemId
+                    }),
+                },
+            });
+            console.log('Notification created:', notification);
+        }
 
         res.json({ success: true, itemId: finalItemId });
     } catch (error: any) {
