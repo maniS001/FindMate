@@ -36,6 +36,8 @@ model Item {
   recoveredAt     DateTime?
   feedbackRating  Int?
   feedbackComment String?
+  reopenReason    String?
+  linkedComplaintId String?
   createdAt   DateTime   @default(now())
   
   userId      String?
