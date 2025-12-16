@@ -1,8 +1,9 @@
 import { Check, CreditCard, Smartphone, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, Linking, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CONFIG } from '../constants/config';
 import { useTheme } from '../contexts/ThemeContext';
+import { showAlert } from '../utils/alert';
 import Button from './Button';
 
 interface PaymentModalProps {
@@ -21,7 +22,7 @@ export default function PaymentModal({ visible, onClose, onSuccess }: PaymentMod
 
     const handlePayment = async () => {
         if (!selectedMethod) {
-            Alert.alert('Select Payment Method', 'Please select a UPI app to proceed.');
+            showAlert('Select Payment Method', 'Please select a UPI app to proceed.');
             return;
         }
 
@@ -46,17 +47,17 @@ export default function PaymentModal({ visible, onClose, onSuccess }: PaymentMod
                     // For now, we'll just simulate success after a delay if they return
                     setTimeout(() => {
                         setLoading(false);
-                        Alert.alert('Payment Status', 'Did you complete the payment?', [
+                        showAlert('Payment Status', 'Did you complete the payment?', [
                             { text: 'No', style: 'cancel' },
                             { text: 'Yes', onPress: onSuccess }
                         ]);
                     }, 2000);
                 } else {
-                    Alert.alert('Error', 'UPI app not found');
+                    showAlert('Error', 'UPI app not found');
                     setLoading(false);
                 }
             } catch (error) {
-                Alert.alert('Error', 'Failed to open payment app');
+                showAlert('Error', 'Failed to open payment app');
                 setLoading(false);
             }
         }
@@ -65,11 +66,11 @@ export default function PaymentModal({ visible, onClose, onSuccess }: PaymentMod
     const handleSandboxResult = (success: boolean) => {
         setShowSandbox(false);
         if (success) {
-            Alert.alert('Sandbox Success', 'Payment simulated successfully!', [
+            showAlert('Sandbox Success', 'Payment simulated successfully!', [
                 { text: 'OK', onPress: onSuccess }
             ]);
         } else {
-            Alert.alert('Sandbox Failed', 'Payment simulation failed.');
+            showAlert('Sandbox Failed', 'Payment simulation failed.');
         }
     };
 
