@@ -429,12 +429,16 @@ app.patch('/api/complaints/:id', async (req, res) => {
                         const item = await prisma.item.findUnique({ where: { id: payload.itemId } });
                         console.log(`Found item:`, item?.id, item?.status);
                         if (item && item.userId) {
-                            // Update item status to CLOSED
+                            // Determine if this was a Claim (via verification) or intentional close
+                            const isClaim = closureReason === 'Founder contacted via Notification';
+                            const newStatus = isClaim ? 'CLAIMED' : 'CLOSED';
+
+                            // Update item status
                             await prisma.item.update({
                                 where: { id: payload.itemId },
-                                data: { status: 'CLAIMED' }
+                                data: { status: newStatus }
                             });
-                            console.log(`Updated item ${payload.itemId} status to CLAIMED`);
+                            console.log(`Updated item ${payload.itemId} status to ${newStatus}`);
 
                             // Notify founder that victim closed the complaint
                             await prisma.notification.create({
