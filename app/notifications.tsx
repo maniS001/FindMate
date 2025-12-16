@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Bell, RefreshCw } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FeedbackModal from '../components/FeedbackModal';
 import { API_URL } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { showAlert } from '../utils/alert';
 
 interface Notification {
     id: string;
@@ -67,10 +68,10 @@ export default function NotificationsScreen() {
             });
             if (!response.ok) throw new Error('Failed to resolve');
             setShowFeedbackModal(false);
-            Alert.alert('Success', 'Marked as resolved! Thank you for your feedback.');
+            showAlert('Success', 'Marked as resolved! Thank you for your feedback.');
             fetchNotifications(); // Refresh to update status
         } catch (error) {
-            Alert.alert('Error', 'Failed to mark as resolved.');
+            showAlert('Error', 'Failed to mark as resolved.');
         } finally {
             setActionLoading(false);
         }
@@ -91,10 +92,10 @@ export default function NotificationsScreen() {
                 }),
             });
             if (!response.ok) throw new Error('Failed to reopen');
-            Alert.alert('Success', 'Complaint reopened successfully.');
+            showAlert('Success', 'Complaint reopened successfully.');
             fetchNotifications(); // Refresh to update status
         } catch (error) {
-            Alert.alert('Error', 'Failed to reopen complaint.');
+            showAlert('Error', 'Failed to reopen complaint.');
         } finally {
             setActionLoading(false);
         }

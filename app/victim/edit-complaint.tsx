@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CategoryPicker from '../../components/CategoryPicker';
@@ -9,6 +9,7 @@ import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getComplaintById, updateComplaint } from '../../store';
+import { showAlert } from '../../utils/alert';
 
 export default function EditComplaint() {
     const router = useRouter();
@@ -51,12 +52,12 @@ export default function EditComplaint() {
                 });
                 setDate(new Date(data.date));
             } else {
-                Alert.alert('Error', 'Complaint not found');
+                showAlert('Error', 'Complaint not found');
                 router.back();
             }
         } catch (error) {
             console.error('Fetch error:', error);
-            Alert.alert('Error', 'Failed to load complaint details');
+            showAlert('Error', 'Failed to load complaint details');
         } finally {
             setLoading(false);
         }
@@ -64,7 +65,7 @@ export default function EditComplaint() {
 
     const handleSubmit = async () => {
         if (!form.name || !form.category || !form.location || !form.contactInfo) {
-            Alert.alert('Missing Information', 'Please fill in all required fields.');
+            showAlert('Missing Information', 'Please fill in all required fields.');
             return;
         }
 
@@ -96,12 +97,12 @@ export default function EditComplaint() {
                 imageUris: base64Images,
             });
 
-            Alert.alert('Success', 'Report updated successfully.', [
+            showAlert('Success', 'Report updated successfully.', [
                 { text: 'OK', onPress: () => router.back() }
             ]);
         } catch (error) {
             console.error('Update error:', error);
-            Alert.alert('Error', 'Failed to update report.');
+            showAlert('Error', 'Failed to update report.');
         } finally {
             setSubmitting(false);
         }

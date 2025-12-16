@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import Captcha from '../../components/Captcha';
@@ -11,6 +11,7 @@ import PaymentModal from '../../components/PaymentModal';
 import { CONFIG } from '../../constants/config';
 import { useTheme } from '../../contexts/ThemeContext';
 import { updateComplaintStatus } from '../../store';
+import { showAlert } from '../../utils/alert';
 
 export default function VerifyNotificationScreen() {
     const { payload, notificationId } = useLocalSearchParams<{ payload: string; notificationId: string }>();
@@ -91,7 +92,7 @@ export default function VerifyNotificationScreen() {
                 }
                 setShowSuccess(true);
             } else {
-                Alert.alert('Verification Failed', 'One or more answers are incorrect. Please try again.');
+                showAlert('Verification Failed', 'One or more answers are incorrect. Please try again.');
             }
             setLoading(false);
         }, 1000);

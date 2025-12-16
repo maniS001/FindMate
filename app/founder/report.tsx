@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CategoryPicker from '../../components/CategoryPicker';
@@ -10,6 +10,7 @@ import Input from '../../components/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { addItem } from '../../store';
+import { showAlert } from '../../utils/alert';
 
 export default function ReportFoundItem() {
     const router = useRouter();
@@ -50,7 +51,7 @@ export default function ReportFoundItem() {
         const areQuestionsValid = form.questions.every(q => q.question.trim() && q.answer.trim());
 
         if (!form.name || !form.location || !areQuestionsValid || !form.contactInfo) {
-            Alert.alert('Missing Information', 'Please fill in all required fields, including all security questions and answers.');
+            showAlert('Missing Information', 'Please fill in all required fields, including all security questions and answers.');
             return;
         }
 
@@ -79,7 +80,7 @@ export default function ReportFoundItem() {
             });
         } catch (error) {
             console.error('Submit error:', error);
-            Alert.alert('Error', 'Failed to report item. Please try again.');
+            showAlert('Error', 'Failed to report item. Please try again.');
         } finally {
             setLoading(false);
         }

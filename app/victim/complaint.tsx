@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CategoryPicker from '../../components/CategoryPicker';
@@ -10,6 +10,7 @@ import Input from '../../components/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { addComplaint } from '../../store';
+import { showAlert } from '../../utils/alert';
 
 export default function FileComplaint() {
     const router = useRouter();
@@ -29,7 +30,7 @@ export default function FileComplaint() {
 
     const handleSubmit = async () => {
         if (!form.name || !form.category || !form.location || !form.contactInfo) {
-            Alert.alert('Missing Information', 'Please fill in all required fields.');
+            showAlert('Missing Information', 'Please fill in all required fields.');
             return;
         }
 
@@ -58,7 +59,7 @@ export default function FileComplaint() {
             });
         } catch (error) {
             console.error('Submit error:', error);
-            Alert.alert('Error', 'Failed to file complaint. Please try again.');
+            showAlert('Error', 'Failed to file complaint. Please try again.');
         } finally {
             setLoading(false);
         }

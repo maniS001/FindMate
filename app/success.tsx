@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { claimItem, Complaint, getComplaints, updateComplaintStatus, updateItemStatus } from '../store';
+import { showAlert } from '../utils/alert';
 
 export default function Success() {
     const router = useRouter();
@@ -34,7 +35,7 @@ export default function Success() {
         const hasContactInfo = !!params.contactInfo;
         return () => {
             if (hasContactInfo) {
-                Alert.alert(
+                showAlert(
                     'Complaint Resolved',
                     'Since you have viewed the contact details, we have marked this inquiry as resolved. If you did not recover your item, you can reopen it from your account.',
                     [{ text: 'OK' }]
@@ -106,12 +107,12 @@ export default function Success() {
             if (userComplaints.length > 0) {
                 setShowComplaintModal(true);
             } else {
-                Alert.alert('Great!', 'We are happy you found your item. The item status has been updated.', [
+                showAlert('Great!', 'We are happy you found your item. The item status has been updated.', [
                     { text: 'OK', onPress: () => router.push('/') }
                 ]);
             }
         } catch (error) {
-            Alert.alert('Error', 'Failed to update item status. Please try again.');
+            showAlert('Error', 'Failed to update item status. Please try again.');
         } finally {
             setUpdating(false);
         }
@@ -125,16 +126,16 @@ export default function Success() {
 
         try {
             await updateComplaintStatus(selectedComplaintId, 'RESOLVED', 'Item recovered via FindMate');
-            Alert.alert('Success', 'Item marked as recovered and complaint closed!', [
+            showAlert('Success', 'Item marked as recovered and complaint closed!', [
                 { text: 'OK', onPress: () => router.push('/') }
             ]);
         } catch (error) {
-            Alert.alert('Error', 'Failed to close complaint.');
+            showAlert('Error', 'Failed to close complaint.');
         }
     };
 
     // Determine whether to show the "Go Back" button
-    const showBackButton = params.type !== 'complaint' && params.type !== 'notified';
+    const showBackButton = params.type !== 'complaint' && params.type !== 'notified' && params.type !== 'payment' && params.type !== 'verification';
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>

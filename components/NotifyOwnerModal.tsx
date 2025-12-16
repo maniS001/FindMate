@@ -1,5 +1,5 @@
 import { Package, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Item } from '../store';
@@ -16,9 +16,10 @@ interface NotifyOwnerModalProps {
     }) => void;
     loading?: boolean;
     userItems?: Item[];
+    preselectedItemId?: string;
 }
 
-export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading, userItems = [] }: NotifyOwnerModalProps) {
+export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading, userItems = [], preselectedItemId }: NotifyOwnerModalProps) {
     const { colors } = useTheme();
     const [questions, setQuestions] = useState([{ question: '', answer: '' }]);
     const [description, setDescription] = useState('');
@@ -27,8 +28,17 @@ export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading, 
     // Item Selection
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
-    // Filter only OPEN items
-    const openItems = userItems.filter(i => !i.status || i.status === 'OPEN');
+    // Filter only OPEN or REOPENED items
+    const openItems = userItems.filter(i => !i.status || i.status === 'OPEN' || i.status === 'REOPENED');
+
+    useEffect(() => {
+        if (visible && preselectedItemId && userItems.length > 0) {
+            const item = userItems.find(i => i.id === preselectedItemId);
+            if (item) {
+                handleSelectFoundItem(item);
+            }
+        }
+    }, [visible, preselectedItemId, userItems]);
 
     const handleSelectFoundItem = (item: Item) => {
         if (selectedItemId === item.id) {

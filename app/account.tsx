@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { AlertCircle, ArrowLeft, Bell, CheckCircle, Edit2, FileText, LogOut, Package, RefreshCw, Star, XCircle } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ConfirmModal from '../components/ConfirmModal';
 import FeedbackModal from '../components/FeedbackModal';
@@ -10,6 +10,7 @@ import { API_URL } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getClaimedItems, getNotifications, Notification, recoverItem, updateComplaintStatus } from '../store';
+import { showAlert } from '../utils/alert';
 
 export default function AccountScreen() {
     const router = useRouter();
@@ -93,9 +94,9 @@ export default function AccountScreen() {
             await updateComplaintStatus(selectedComplaintId, newStatus, reason);
             await fetchProfile();
             setModalVisible(false);
-            Alert.alert('Success', `Complaint ${modalType === 'CLOSE' ? 'closed' : 'reopened'} successfully.`);
+            showAlert('Success', `Complaint ${modalType === 'CLOSE' ? 'closed' : 'reopened'} successfully.`);
         } catch (error) {
-            Alert.alert('Error', 'Failed to update complaint status.');
+            showAlert('Error', 'Failed to update complaint status.');
         } finally {
             setActionLoading(false);
         }
@@ -134,9 +135,9 @@ export default function AccountScreen() {
             }
             await fetchProfile();
             setShowFeedbackModal(false);
-            Alert.alert('Success', 'Marked as resolved! Thank you for your feedback.');
+            showAlert('Success', 'Marked as resolved! Thank you for your feedback.');
         } catch (error) {
-            Alert.alert('Error', 'Failed to mark as resolved.');
+            showAlert('Error', 'Failed to mark as resolved.');
         } finally {
             setActionLoading(false);
         }
@@ -162,7 +163,7 @@ export default function AccountScreen() {
                 }
             });
         } else {
-            Alert.alert('Error', 'Could not find notification details for this verification.');
+            showAlert('Error', 'Could not find notification details for this verification.');
         }
     };
 
@@ -495,16 +496,10 @@ export default function AccountScreen() {
                                                 </Text>
                                             </View>
                                             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-                                                <TouchableOpacity
-                                                    style={[styles.actionButton, { flex: 1, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary + '40' }]}
-                                                    onPress={() => router.push({ pathname: '/founder/edit-item', params: { id: item.id } })}
-                                                >
-                                                    <Text style={[styles.actionText, { color: colors.primary }]}>Edit Item</Text>
-                                                </TouchableOpacity>
                                                 {item.linkedComplaintId && (
                                                     <TouchableOpacity
-                                                        style={[styles.actionButton, { flex: 1.5, justifyContent: 'center', backgroundColor: colors.primary }]}
-                                                        onPress={() => router.push({ pathname: '/founder/complaint-detail', params: { id: item.linkedComplaintId } })}
+                                                        style={[styles.actionButton, { flex: 1, justifyContent: 'center', backgroundColor: colors.primary }]}
+                                                        onPress={() => router.push({ pathname: '/founder/complaint-detail', params: { id: item.linkedComplaintId, prefillFromItemId: item.id } })}
                                                     >
                                                         <Bell size={16} color="#FFF" />
                                                         <Text style={[styles.actionText, { color: '#FFF' }]}>Update & Notify</Text>

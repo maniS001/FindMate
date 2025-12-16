@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CategoryPicker from '../../components/CategoryPicker';
@@ -9,6 +9,7 @@ import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getItemById, updateItem } from '../../store';
+import { showAlert } from '../../utils/alert';
 
 export default function EditFoundItem() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,7 +48,7 @@ export default function EditFoundItem() {
                     setDate(new Date(item.date));
                     setItemStatus(item.status || 'OPEN');
                 } else {
-                    Alert.alert('Error', 'Item not found');
+                    showAlert('Error', 'Item not found');
                     router.back();
                 }
             }
@@ -79,7 +80,7 @@ export default function EditFoundItem() {
         const areQuestionsValid = form.questions.every(q => q.question.trim() && q.answer.trim());
 
         if (!form.name || !form.location || !areQuestionsValid || !form.contactInfo) {
-            Alert.alert('Missing Information', 'Please fill in all required fields, including all security questions and answers.');
+            showAlert('Missing Information', 'Please fill in all required fields, including all security questions and answers.');
             return;
         }
 
@@ -142,12 +143,12 @@ export default function EditFoundItem() {
                     imageUris: finalImages,
                     questions: form.questions,
                 });
-                Alert.alert('Success', 'Item updated successfully');
+                showAlert('Success', 'Item updated successfully');
                 router.back();
             }
         } catch (error) {
             console.error('Update error:', error);
-            Alert.alert('Error', 'Failed to update item. Please try again.');
+            showAlert('Error', 'Failed to update item. Please try again.');
         } finally {
             setLoading(false);
         }

@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Calendar, MapPin, Phone } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
@@ -10,12 +10,13 @@ import { API_URL } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Complaint, getComplaintById, Item, notifyOwner, updateComplaintStatus } from '../../store';
+import { showAlert } from '../../utils/alert';
 
 const { width } = Dimensions.get('window');
 const IMAGE_WIDTH = width - 48; // 24px padding on each side
 
 export default function ComplaintDetail() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { id, prefillFromItemId } = useLocalSearchParams<{ id: string; prefillFromItemId?: string }>();
     const { colors } = useTheme();
     const { token } = useAuth();
     const router = useRouter();
@@ -51,6 +52,12 @@ export default function ComplaintDetail() {
         fetchData();
     }, [id, token]);
 
+    useEffect(() => {
+        if (prefillFromItemId && !loading && userItems.length > 0) {
+            setNotifyModalVisible(true);
+        }
+    }, [prefillFromItemId, loading, userItems]);
+
     const handleNotify = async (data: { questions: { question: string; answer: string }[]; description: string; phone: string; itemId?: string }) => {
         if (!complaint || !token) return;
         setNotifyLoading(true);
@@ -70,7 +77,7 @@ export default function ComplaintDetail() {
                 params: { type: 'notified' }
             });
         } catch (error) {
-            Alert.alert('Error', 'Failed to notify owner.');
+            showAlert('Error', 'Failed to notify owner.');
         } finally {
             setNotifyLoading(false);
         }
@@ -217,6 +224,7 @@ export default function ComplaintDetail() {
                 onSubmit={handleNotify}
                 loading={notifyLoading}
                 userItems={userItems}
+                preselectedItemId={prefillFromItemId}
             />
         </SafeAreaView>
     );

@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Calendar, MapPin } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../../components/Button';
 import Captcha from '../../../components/Captcha';
@@ -13,6 +13,7 @@ import PaymentModal from '../../../components/PaymentModal';
 import { CONFIG } from '../../../constants/config';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { getItemById, Item } from '../../../store';
+import { showAlert } from '../../../utils/alert';
 
 const { width } = Dimensions.get('window');
 const IMAGE_WIDTH = width - 48; // 24px padding on each side
@@ -94,7 +95,7 @@ export default function ClaimItem() {
                 handlePaymentSuccess();
             }
         } else {
-            Alert.alert('❌ Incorrect Answer', 'One or more answers are incorrect. Please try again.');
+            showAlert('❌ Incorrect Answer', 'One or more answers are incorrect. Please try again.');
         }
     };
 
@@ -241,7 +242,7 @@ export default function ClaimItem() {
             />
 
             <KeyboardAvoidingView
-                behavior="padding"
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
                 keyboardVerticalOffset={!isOtpVerified ? 100 : 0}
                 enabled
