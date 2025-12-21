@@ -47,7 +47,8 @@ export default function Login() {
         setLoading(true);
         try {
             // Get the idToken from the Google Sign-In response
-            const { idToken } = userInfo.data;
+            // Get the idToken and location from the Google Sign-In response
+            const { idToken, location } = userInfo.data;
 
             if (!idToken) {
                 throw new Error('No ID token found');
@@ -56,7 +57,7 @@ export default function Login() {
             const response = await fetch(`${API_URL}/auth/google`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken }),
+                body: JSON.stringify({ idToken, location }),
             });
 
             const data = await response.json();

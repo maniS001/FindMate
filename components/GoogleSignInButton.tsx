@@ -3,6 +3,7 @@ import {
     GoogleSignin,
     statusCodes
 } from '@react-native-google-signin/google-signin';
+import * as Location from 'expo-location';
 import React, { useEffect, useRef } from 'react';
 import { Alert, PermissionsAndroid, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -74,18 +75,47 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
         // Native: { data: { idToken: ... }, ... }
         // Web: { credential: ... } (which is the idToken)
 
-        const userInfo = {
-            data: {
-                idToken: response.credential,
-                user: {
-                    // We can decode the JWT here if we needed user details immediately,
-                    // but the backend will verify the token and return the user anyway.
-                    email: 'google-user@example.com', // Placeholder
-                    name: 'Google User', // Placeholder
+        // Fetch location (Web)
+        getLocation().then(location => {
+            const userInfo = {
+                data: {
+                    idToken: response.credential,
+                    location, // Add location to data
+                    user: {
+                        // We can decode the JWT here if we needed user details immediately,
+                        // but the backend will verify the token and return the user anyway.
+                        email: 'google-user@example.com', // Placeholder
+                        name: 'Google User', // Placeholder
+                    }
                 }
+            };
+            onSignInSuccess(userInfo);
+        });
+    };
+
+    const getLocation = async () => {
+        try {
+            let { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                console.log('Permission to access location was denied');
+                return null;
             }
-        };
-        onSignInSuccess(userInfo);
+
+            let location = await Location.getCurrentPositionAsync({});
+            let reverseGeocode = await Location.reverseGeocodeAsync({
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude
+            });
+
+            if (reverseGeocode.length > 0) {
+                const address = reverseGeocode[0];
+                // improved location string: City, Area or just City
+                return `${address.city || address.region || ''}, ${address.district || address.name || ''}`;
+            }
+        } catch (error) {
+            console.log('Error getting location:', error);
+        }
+        return null;
     };
 
     // ==========================================
@@ -110,6 +140,10 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
         try {
             await GoogleSignin.hasPlayServices();
             const userInfo = await GoogleSignin.signIn();
+            const location = await getLocation(); // Fetch location
+            // Attach location to userInfo object (as a custom property)
+            (userInfo as any).data = { ...(userInfo as any).data, location };
+
             await requestNativePermissions();
             onSignInSuccess(userInfo);
         } catch (error: any) {

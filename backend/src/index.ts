@@ -79,7 +79,7 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 app.post('/api/auth/google', async (req, res) => {
     try {
-        const { idToken } = req.body;
+        const { idToken, location } = req.body;
 
         if (!idToken) {
             return res.status(400).json({ error: 'ID Token is required' });
@@ -112,6 +112,7 @@ app.post('/api/auth/google', async (req, res) => {
                     email,
                     name: name || 'Google User',
                     googleId,
+                    location, // Save location
                     password: '' // No password for Google users
                 },
             });
@@ -119,7 +120,7 @@ app.post('/api/auth/google', async (req, res) => {
             // Link existing account
             user = await prisma.user.update({
                 where: { id: user.id },
-                data: { googleId },
+                data: { googleId, location }, // Update location if provided
             });
         }
 
@@ -259,6 +260,42 @@ app.post('/api/complaints', async (req, res) => {
             },
         });
         res.json(complaint);
+
+        // Find users in the same location and notify them
+        if (location) {
+            try {
+                // Simple case-insensitive exact string match or substring match
+                // In a real app, use geospatial queries (PostGIS) or improved fuzzy matching
+                const usersInLocation = await prisma.user.findMany({
+                    where: {
+                        location: {
+                            contains: location,
+                            mode: 'insensitive',
+                        },
+                        NOT: {
+                            id: userId || 'unknown-id', // Don't notify the one who filed it
+                        }
+                    }
+                });
+
+                if (usersInLocation.length > 0) {
+                    const notifications = usersInLocation.map(user => ({
+                        userId: user.id,
+                        title: 'New Complaint in Your Area',
+                        message: `Someone lost a "${name}" in ${location}. Check if you can help!`,
+                        type: 'AREA_ALERT',
+                        payload: JSON.stringify({ complaintId: complaint.id, location }),
+                    }));
+
+                    await prisma.notification.createMany({
+                        data: notifications
+                    });
+                    console.log(`Sent ${notifications.length} location-based notifications.`);
+                }
+            } catch (notifyError) {
+                console.error('Error sending location notifications:', notifyError);
+            }
+        }
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to create complaint' });
