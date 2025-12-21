@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
+import { GoogleSignInBtn } from '../../components/GoogleSignInButton';
 import Input from '../../components/Input';
 import { API_URL } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -42,24 +43,20 @@ export default function Login() {
         }
     };
 
-    const handleGoogleLogin = async () => {
-        // Mock Google Login Flow
+    const handleGoogleLogin = async (userInfo: any) => {
         setLoading(true);
         try {
-            // Simulate Google Auth Prompt delay
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Get the idToken from the Google Sign-In response
+            const { idToken } = userInfo.data;
 
-            // Mock Google User Data
-            const mockGoogleUser = {
-                email: 'testuser@gmail.com',
-                name: 'Test User',
-                googleId: 'mock-google-id-12345'
-            };
+            if (!idToken) {
+                throw new Error('No ID token found');
+            }
 
             const response = await fetch(`${API_URL}/auth/google`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(mockGoogleUser),
+                body: JSON.stringify({ idToken }),
             });
 
             const data = await response.json();
@@ -111,12 +108,9 @@ export default function Login() {
                         <View style={[styles.line, { backgroundColor: colors.border }]} />
                     </View>
 
-                    <Button
-                        title="Continue with Google"
-                        onPress={handleGoogleLogin}
-                        variant="outline"
-                        style={styles.googleButton}
-                        disabled={loading}
+                    <GoogleSignInBtn
+                        onSignInSuccess={handleGoogleLogin}
+                        onSignInFailure={(error) => Alert.alert('Error', error.message || 'Google Sign-In failed')}
                     />
 
                     <View style={styles.footer}>

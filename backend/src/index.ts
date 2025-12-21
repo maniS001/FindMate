@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
+import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { findMatchingComplaints } from './matching';
 
@@ -12,7 +13,7 @@ dotenv.config();
 const app = express();
 const prisma = new PrismaClient();
 const port = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || "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";//'your-secret-key-change-in-production';
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -73,16 +74,46 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// Google Login (Mock/Simplified)
+// Google Login (Real Implementation)
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 app.post('/api/auth/google', async (req, res) => {
     try {
-        const { email, name, googleId } = req.body;
+        const { idToken } = req.body;
+
+        if (!idToken) {
+            return res.status(400).json({ error: 'ID Token is required' });
+        }
+
+        // Verify the token
+        const ticket = await client.verifyIdToken({
+            idToken,
+            audience: process.env.GOOGLE_CLIENT_ID, // Specify the CLIENT_ID of the app that accesses the backend
+            // Or, if multiple clients access the backend:
+            //[CLIENT_ID_1, CLIENT_ID_2, CLIENT_ID_3]
+        });
+
+        const payload = ticket.getPayload();
+        if (!payload) {
+            return res.status(400).json({ error: 'Invalid token payload' });
+        }
+
+        const { email, name, sub: googleId } = payload;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email not found in token' });
+        }
 
         let user = await prisma.user.findUnique({ where: { email } });
 
         if (!user) {
             user = await prisma.user.create({
-                data: { email, name, googleId, password: '' }, // No password for Google users
+                data: {
+                    email,
+                    name: name || 'Google User',
+                    googleId,
+                    password: '' // No password for Google users
+                },
             });
         } else if (!user.googleId) {
             // Link existing account
@@ -95,7 +126,7 @@ app.post('/api/auth/google', async (req, res) => {
         const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET);
         res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
     } catch (error) {
-        console.error(error);
+        console.error('Google auth error:', error);
         res.status(500).json({ error: 'Google auth failed' });
     }
 });
