@@ -107,28 +107,66 @@ app.post('/api/auth/google', async (req, res) => {
         let user = await prisma.user.findUnique({ where: { email } });
 
         if (!user) {
-            user = await prisma.user.create({
-                data: {
-                    email,
-                    name: name || 'Google User',
-                    googleId,
-                    location, // Save location
-                    password: '' // No password for Google users
-                },
-            });
+            try {
+                // Try to create with location
+                user = await prisma.user.create({
+                    data: {
+                        email,
+                        name: name || 'Google User',
+                        googleId,
+                        location, // Save location
+                        password: '' // No password for Google users
+                    },
+                });
+            } catch (createError) {
+                console.warn('Failed to save location (DB schema might be outdated). Retrying without location.');
+                // Fallback: Create without location
+                user = await prisma.user.create({
+                    data: {
+                        email,
+                        name: name || 'Google User',
+                        googleId,
+                        password: ''
+                    },
+                });
+            }
         } else if (!user.googleId) {
             // Link existing account
-            user = await prisma.user.update({
-                where: { id: user.id },
-                data: { googleId, location }, // Update location if provided
-            });
+            try {
+                user = await prisma.user.update({
+                    where: { id: user.id },
+                    data: { googleId, location }, // Update location if provided
+                });
+            } catch (updateError) {
+                console.warn('Failed to update location. Retrying without location.');
+                user = await prisma.user.update({
+                    where: { id: user.id },
+                    data: { googleId },
+                });
+            }
+        } else {
+            // User exists and is linked. Update location if possible.
+            try {
+                if (location) {
+                    await prisma.user.update({
+                        where: { id: user.id },
+                        data: { location }
+                    });
+                }
+            } catch (ignore) {
+                // Ignore location update error (e.g. column missing)
+                console.warn('Could not update user location (schema mismatch?)');
+            }
         }
 
         const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET);
         res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
     } catch (error) {
         console.error('Google auth error:', error);
-        res.status(500).json({ error: 'Google auth failed' });
+        res.status(500).json({
+            error: 'Google auth failed',
+            details: error instanceof Error ? error.message : String(error)
+        });
     }
 });
 

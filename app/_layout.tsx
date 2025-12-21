@@ -1,5 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { View } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,6 +11,8 @@ import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 
 function RootLayoutContent() {
   const { theme, colors } = useTheme();
+  const pathname = usePathname();
+  const shouldHideHeader = pathname === '/auth/login';
 
   const navigationTheme = theme === 'dark' ? DarkTheme : DefaultTheme;
 
@@ -18,7 +20,7 @@ function RootLayoutContent() {
     <NavigationThemeProvider value={navigationTheme}>
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <Header />
+          {!shouldHideHeader && <Header />}
           <WebContainer>
             <Stack
               screenOptions={{

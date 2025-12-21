@@ -1,6 +1,6 @@
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import { GoogleSignInBtn } from '../../components/GoogleSignInButton';
@@ -73,57 +73,59 @@ export default function Login() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-            <View style={styles.content}>
-                <View style={styles.header}>
-                    <Text style={[styles.title, { color: colors.primary }]}>FindMate</Text>
-                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Welcome back!</Text>
-                </View>
-
-                <View style={styles.form}>
-                    <Input
-                        label="Email"
-                        value={email}
-                        onChangeText={setEmail}
-                        placeholder="Enter your email"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                    />
-                    <Input
-                        label="Password"
-                        value={password}
-                        onChangeText={setPassword}
-                        placeholder="Enter your password"
-                        secureTextEntry
-                    />
-
-                    <Button
-                        title="Login"
-                        onPress={handleLogin}
-                        loading={loading}
-                        style={styles.button}
-                    />
-
-                    <View style={styles.divider}>
-                        <View style={[styles.line, { backgroundColor: colors.border }]} />
-                        <Text style={[styles.orText, { color: colors.textSecondary }]}>OR</Text>
-                        <View style={[styles.line, { backgroundColor: colors.border }]} />
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+                <View style={styles.content}>
+                    <View style={styles.header}>
+                        <Text style={[styles.title, { color: colors.primary }]}>FindMate</Text>
+                        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Welcome back!</Text>
                     </View>
 
-                    <GoogleSignInBtn
-                        onSignInSuccess={handleGoogleLogin}
-                        onSignInFailure={(error) => Alert.alert('Error', error.message || 'Google Sign-In failed')}
-                    />
+                    <View style={styles.form}>
+                        <Input
+                            label="Email"
+                            value={email}
+                            onChangeText={setEmail}
+                            placeholder="Enter your email"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                        />
+                        <Input
+                            label="Password"
+                            value={password}
+                            onChangeText={setPassword}
+                            placeholder="Enter your password"
+                            secureTextEntry
+                        />
 
-                    <View style={styles.footer}>
-                        <Text style={[styles.footerText, { color: colors.textSecondary }]}>
-                            Don't have an account?
-                        </Text>
-                        <Link href="/auth/signup" asChild>
-                            <Text style={StyleSheet.flatten([styles.link, { color: colors.primary }])}>Sign Up</Text>
-                        </Link>
+                        <Button
+                            title="Login"
+                            onPress={handleLogin}
+                            loading={loading}
+                            style={styles.button}
+                        />
+
+                        <View style={styles.divider}>
+                            <View style={[styles.line, { backgroundColor: colors.border }]} />
+                            <Text style={[styles.orText, { color: colors.textSecondary }]}>OR</Text>
+                            <View style={[styles.line, { backgroundColor: colors.border }]} />
+                        </View>
+
+                        <GoogleSignInBtn
+                            onSignInSuccess={handleGoogleLogin}
+                            onSignInFailure={(error) => Alert.alert('Error', error.message || 'Google Sign-In failed')}
+                        />
+
+                        <View style={styles.footer}>
+                            <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+                                Don't have an account?
+                            </Text>
+                            <Link href="/auth/signup" asChild>
+                                <Text style={StyleSheet.flatten([styles.link, { color: colors.primary }])}>Sign Up</Text>
+                            </Link>
+                        </View>
                     </View>
                 </View>
-            </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
@@ -132,10 +134,15 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    content: {
-        flex: 1,
-        padding: 24,
+    scrollContent: {
+        flexGrow: 1,
         justifyContent: 'center',
+    },
+    content: {
+        padding: 24,
+        width: '100%',
+        maxWidth: 480, // Limit width for large screens
+        alignSelf: 'center',
     },
     header: {
         alignItems: 'center',
@@ -158,7 +165,7 @@ const styles = StyleSheet.create({
     divider: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 16,
+        marginVertical: 8, // Reduced from 16
     },
     line: {
         flex: 1,
