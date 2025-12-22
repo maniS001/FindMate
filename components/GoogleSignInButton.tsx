@@ -133,6 +133,12 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
 
     const getLocation = async () => {
         try {
+            // Web: Check if geolocation is available first to avoid errors
+            if (Platform.OS === 'web' && !navigator.geolocation) {
+                console.log('Geolocation not supported on this browser');
+                return null;
+            }
+
             let { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 console.log('Permission to access location was denied');
@@ -140,18 +146,26 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
             }
 
             let location = await Location.getCurrentPositionAsync({});
-            let reverseGeocode = await Location.reverseGeocodeAsync({
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude
-            });
 
-            if (reverseGeocode.length > 0) {
-                const address = reverseGeocode[0];
-                // improved location string: City, Area or just City
-                return `${address.city || address.region || ''}, ${address.district || address.name || ''}`;
+            // On Web, reverseGeocodeAsync might be deprecated/flaky. 
+            // We'll wrap it in a separate try-catch to not fail the whole location fetch.
+            if (Platform.OS !== 'web') {
+                let reverseGeocode = await Location.reverseGeocodeAsync({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                });
+
+                if (reverseGeocode.length > 0) {
+                    const address = reverseGeocode[0];
+                    return `${address.city || address.region || ''}, ${address.district || address.name || ''}`;
+                }
+            } else {
+                // Web-specific or skip reverse geocoding to avoid warning
+                return `${location.coords.latitude.toFixed(2)}, ${location.coords.longitude.toFixed(2)}`;
             }
+
         } catch (error) {
-            console.log('Error getting location:', error);
+            console.log('Error getting location (ignoring to allow login):', error);
         }
         return null;
     };
