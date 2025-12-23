@@ -70,16 +70,21 @@ app.post('/api/auth/login', async (req, res) => {
         res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Login failed' });
+        res.status(500).json({
+            error: 'Login failed',
+            details: error instanceof Error ? error.message : String(error)
+        });
     }
 });
 
 // Google Login (Real Implementation)
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Google Login (Real Implementation)
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 app.post('/api/auth/google', async (req, res) => {
     try {
-        const { idToken } = req.body;
+        const { idToken, location } = req.body;
 
         if (!idToken) {
             return res.status(400).json({ error: 'ID Token is required' });
@@ -88,9 +93,7 @@ app.post('/api/auth/google', async (req, res) => {
         // Verify the token
         const ticket = await client.verifyIdToken({
             idToken,
-            audience: process.env.GOOGLE_CLIENT_ID, // Specify the CLIENT_ID of the app that accesses the backend
-            // Or, if multiple clients access the backend:
-            //[CLIENT_ID_1, CLIENT_ID_2, CLIENT_ID_3]
+            audience: GOOGLE_CLIENT_ID, // Specify the CLIENT_ID of the app that accesses the backend
         });
 
         const payload = ticket.getPayload();
@@ -107,27 +110,66 @@ app.post('/api/auth/google', async (req, res) => {
         let user = await prisma.user.findUnique({ where: { email } });
 
         if (!user) {
-            user = await prisma.user.create({
-                data: {
-                    email,
-                    name: name || 'Google User',
-                    googleId,
-                    password: '' // No password for Google users
-                },
-            });
+            try {
+                // Try to create with location
+                user = await prisma.user.create({
+                    data: {
+                        email,
+                        name: name || 'Google User',
+                        googleId,
+                        location, // Save location
+                        password: '' // No password for Google users
+                    },
+                });
+            } catch (createError) {
+                console.warn('Failed to save location (DB schema might be outdated). Retrying without location.');
+                // Fallback: Create without location
+                user = await prisma.user.create({
+                    data: {
+                        email,
+                        name: name || 'Google User',
+                        googleId,
+                        password: ''
+                    },
+                });
+            }
         } else if (!user.googleId) {
             // Link existing account
-            user = await prisma.user.update({
-                where: { id: user.id },
-                data: { googleId },
-            });
+            try {
+                user = await prisma.user.update({
+                    where: { id: user.id },
+                    data: { googleId, location }, // Update location if provided
+                });
+            } catch (updateError) {
+                console.warn('Failed to update location. Retrying without location.');
+                user = await prisma.user.update({
+                    where: { id: user.id },
+                    data: { googleId },
+                });
+            }
+        } else {
+            // User exists and is linked. Update location if possible.
+            try {
+                if (location) {
+                    await prisma.user.update({
+                        where: { id: user.id },
+                        data: { location }
+                    });
+                }
+            } catch (ignore) {
+                // Ignore location update error (e.g. column missing)
+                console.warn('Could not update user location (schema mismatch?)');
+            }
         }
 
         const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET);
         res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
     } catch (error) {
         console.error('Google auth error:', error);
-        res.status(500).json({ error: 'Google auth failed' });
+        res.status(500).json({
+            error: 'Google auth failed',
+            details: error instanceof Error ? error.message : String(error)
+        });
     }
 });
 
@@ -259,6 +301,42 @@ app.post('/api/complaints', async (req, res) => {
             },
         });
         res.json(complaint);
+
+        // Find users in the same location and notify them
+        if (location) {
+            try {
+                // Simple case-insensitive exact string match or substring match
+                // In a real app, use geospatial queries (PostGIS) or improved fuzzy matching
+                const usersInLocation = await prisma.user.findMany({
+                    where: {
+                        location: {
+                            contains: location,
+                            mode: 'insensitive',
+                        },
+                        NOT: {
+                            id: userId || 'unknown-id', // Don't notify the one who filed it
+                        }
+                    }
+                });
+
+                if (usersInLocation.length > 0) {
+                    const notifications = usersInLocation.map(user => ({
+                        userId: user.id,
+                        title: 'New Complaint in Your Area',
+                        message: `Someone lost a "${name}" in ${location}. Check if you can help!`,
+                        type: 'AREA_ALERT',
+                        payload: JSON.stringify({ complaintId: complaint.id, location }),
+                    }));
+
+                    await prisma.notification.createMany({
+                        data: notifications
+                    });
+                    console.log(`Sent ${notifications.length} location-based notifications.`);
+                }
+            } catch (notifyError) {
+                console.error('Error sending location notifications:', notifyError);
+            }
+        }
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to create complaint' });

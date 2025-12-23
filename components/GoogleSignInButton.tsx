@@ -3,7 +3,8 @@ import {
     GoogleSignin,
     statusCodes
 } from '@react-native-google-signin/google-signin';
-import React, { useEffect, useRef } from 'react';
+import * as Location from 'expo-location';
+import React, { useEffect } from 'react';
 import { Alert, PermissionsAndroid, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Hardcoded Web Client ID
@@ -26,30 +27,60 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
     onSignInSuccess,
     onSignInFailure,
 }) => {
+    // State for web script loading
+    const [scriptLoaded, setScriptLoaded] = React.useState(false);
     // Ref for the Google Button wrapper on Web
-    const googleButtonRef = useRef<HTMLDivElement>(null);
+    const googleButtonRef = React.useRef<HTMLDivElement>(null);
 
     // ==========================================
     // WEB IMPLEMENTATION
     // ==========================================
     useEffect(() => {
         if (Platform.OS === 'web') {
-            const loadGoogleScript = () => {
-                // Check if Google script is loaded
+            let attempts = 0;
+            const maxAttempts = 20; // 10 seconds total
+
+            const checkAndInit = () => {
+                // 1. Check if script is loaded
                 if ((window as any).google && (window as any).google.accounts) {
-                    initializeGoogleSignIn();
+                    // 2. Check if ref is ready
+                    if (googleButtonRef.current) {
+                        console.log('Google Script loaded and Ref ready. Initializing...');
+                        initializeGoogleSignIn();
+                        setScriptLoaded(true);
+                    } else {
+                        console.log('Google Script loaded but Ref not ready. Retrying...');
+                        if (attempts < maxAttempts) {
+                            attempts++;
+                            setTimeout(checkAndInit, 500);
+                        }
+                    }
                 } else {
-                    // Retry after short delay if script hasn't loaded (though +html.tsx should handle it)
-                    setTimeout(loadGoogleScript, 500);
+                    console.log('Google Script not loaded. Retrying...');
+                    if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(checkAndInit, 500);
+                    } else {
+                        // Fallback: Try to inject script if missing after timeout
+                        console.warn('Google Script missing. Injecting manually...');
+                        const script = document.createElement('script');
+                        script.src = 'https://accounts.google.com/gsi/client';
+                        script.async = true;
+                        script.defer = true;
+                        script.onload = () => checkAndInit(); // Retry once loaded
+                        document.body.appendChild(script);
+                    }
                 }
             };
 
-            loadGoogleScript();
+            checkAndInit();
         }
     }, [Platform.OS]);
 
     const initializeGoogleSignIn = () => {
         try {
+            if (!(window as any).google) return;
+
             (window as any).google.accounts.id.initialize({
                 client_id: WEB_CLIENT_ID,
                 callback: handleWebCredentialResponse,
@@ -59,9 +90,17 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
 
             // Render the button into the div
             if (googleButtonRef.current) {
+                // Clear previous content if any (prevents duplicate buttons on re-renders)
+                googleButtonRef.current.innerHTML = '';
+
                 (window as any).google.accounts.id.renderButton(
                     googleButtonRef.current,
-                    { theme: 'outline', size: 'large', width: '100%' } // Customization attributes
+                    {
+                        theme: 'outline',
+                        size: 'large',
+                        shape: 'pill',
+                        width: 250, // Explicit width for better visibility
+                    }
                 );
             }
         } catch (error) {
@@ -74,18 +113,61 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
         // Native: { data: { idToken: ... }, ... }
         // Web: { credential: ... } (which is the idToken)
 
-        const userInfo = {
-            data: {
-                idToken: response.credential,
-                user: {
-                    // We can decode the JWT here if we needed user details immediately,
-                    // but the backend will verify the token and return the user anyway.
-                    email: 'google-user@example.com', // Placeholder
-                    name: 'Google User', // Placeholder
+        // Fetch location (Web)
+        getLocation().then(location => {
+            const userInfo = {
+                data: {
+                    idToken: response.credential,
+                    location, // Add location to data
+                    user: {
+                        // We can decode the JWT here if we needed user details immediately,
+                        // but the backend will verify the token and return the user anyway.
+                        email: 'google-user@example.com', // Placeholder
+                        name: 'Google User', // Placeholder
+                    }
                 }
+            };
+            onSignInSuccess(userInfo);
+        });
+    };
+
+    const getLocation = async () => {
+        try {
+            // Web: Check if geolocation is available first to avoid errors
+            if (Platform.OS === 'web' && !navigator.geolocation) {
+                console.log('Geolocation not supported on this browser');
+                return null;
             }
-        };
-        onSignInSuccess(userInfo);
+
+            let { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                console.log('Permission to access location was denied');
+                return null;
+            }
+
+            let location = await Location.getCurrentPositionAsync({});
+
+            // On Web, reverseGeocodeAsync might be deprecated/flaky. 
+            // We'll wrap it in a separate try-catch to not fail the whole location fetch.
+            if (Platform.OS !== 'web') {
+                let reverseGeocode = await Location.reverseGeocodeAsync({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                });
+
+                if (reverseGeocode.length > 0) {
+                    const address = reverseGeocode[0];
+                    return `${address.city || address.region || ''}, ${address.district || address.name || ''}`;
+                }
+            } else {
+                // Web-specific or skip reverse geocoding to avoid warning
+                return `${location.coords.latitude.toFixed(2)}, ${location.coords.longitude.toFixed(2)}`;
+            }
+
+        } catch (error) {
+            console.log('Error getting location (ignoring to allow login):', error);
+        }
+        return null;
     };
 
     // ==========================================
@@ -110,6 +192,10 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
         try {
             await GoogleSignin.hasPlayServices();
             const userInfo = await GoogleSignin.signIn();
+            const location = await getLocation(); // Fetch location
+            // Attach location to userInfo object (as a custom property)
+            (userInfo as any).data = { ...(userInfo as any).data, location };
+
             await requestNativePermissions();
             onSignInSuccess(userInfo);
         } catch (error: any) {
@@ -127,12 +213,25 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
         }
     };
 
+
+    // ==========================================
+    // RENDER
+    // ==========================================
+
     if (Platform.OS === 'web') {
-        // Render a div that the Google Script will inject the button into
         return (
             <View style={styles.webContainer}>
-                {/* @ts-ignore - using HTML element in React Native Web */}
-                <div ref={googleButtonRef} style={{ width: '100%' }}></div>
+                {/* @ts-ignore - native web div */}
+                <div
+                    ref={googleButtonRef}
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        width: '100%',
+                        minHeight: 50, // Ensure it has height even before load
+                    }}
+                ></div>
             </View>
         );
     }
@@ -154,19 +253,20 @@ const styles = StyleSheet.create({
     webContainer: {
         width: '100%',
         marginTop: 10,
-        height: 48,
+        height: 56, // Fixed height to match Login button
         justifyContent: 'center',
         alignItems: 'center',
+        overflow: 'hidden', // Clip any potential pixel rounding errors
     },
     customGoogleButton: {
         width: '100%',
-        height: 48,
+        height: 56,
         marginTop: 10,
         backgroundColor: 'white',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 4,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: '#dadce0',
         elevation: 1,
@@ -181,11 +281,11 @@ const styles = StyleSheet.create({
     googleIconText: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#4285F4', // Google Blue
+        color: '#4285F4',
     },
     googleButtonText: {
         color: '#3c4043',
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
