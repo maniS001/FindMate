@@ -13,7 +13,7 @@ dotenv.config();
 const app = express();
 const prisma = new PrismaClient();
 const port = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || "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";//'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || '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';
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
