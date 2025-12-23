@@ -6,6 +6,7 @@ import {
 import * as Location from 'expo-location';
 import React, { useEffect } from 'react';
 import { Alert, PermissionsAndroid, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { LocationInputModal } from './LocationInputModal';
 
 // Hardcoded Web Client ID
 const WEB_CLIENT_ID = "563053075136-a3q0elaisf04r5voakv5260gvo08qkv4.apps.googleusercontent.com";
@@ -31,6 +32,25 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
     const [scriptLoaded, setScriptLoaded] = React.useState(false);
     // Ref for the Google Button wrapper on Web
     const googleButtonRef = React.useRef<HTMLDivElement>(null);
+
+    // State for manual location modal
+    const [showLocationModal, setShowLocationModal] = React.useState(false);
+    const [pendingUserInfo, setPendingUserInfo] = React.useState<any>(null);
+
+    const handleManualLocation = (location: string | null) => {
+        setShowLocationModal(false);
+        if (pendingUserInfo) {
+            const finalUserInfo = { ...pendingUserInfo };
+            if (!finalUserInfo.data) finalUserInfo.data = {};
+            finalUserInfo.data.location = location;
+
+            // For native, we still want to ask other permissions if we haven't yet
+            if (Platform.OS !== 'web') requestNativePermissions();
+
+            onSignInSuccess(finalUserInfo);
+            setPendingUserInfo(null);
+        }
+    };
 
     // ==========================================
     // WEB IMPLEMENTATION
@@ -109,25 +129,28 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
     };
 
     const handleWebCredentialResponse = (response: any) => {
-        // Map the Web response to the Native response shape expected by the app
-        // Native: { data: { idToken: ... }, ... }
-        // Web: { credential: ... } (which is the idToken)
-
-        // Fetch location (Web)
-        getLocation().then(location => {
-            const userInfo = {
-                data: {
-                    idToken: response.credential,
-                    location, // Add location to data
-                    user: {
-                        // We can decode the JWT here if we needed user details immediately,
-                        // but the backend will verify the token and return the user anyway.
-                        email: 'google-user@example.com', // Placeholder
-                        name: 'Google User', // Placeholder
-                    }
+        // Map the Web response
+        const userInfo = {
+            data: {
+                idToken: response.credential,
+                location: null as string | null,
+                user: {
+                    email: 'google-user@example.com',
+                    name: 'Google User',
                 }
-            };
-            onSignInSuccess(userInfo);
+            }
+        };
+
+        // Try auto location first
+        getLocation().then(location => {
+            if (location) {
+                userInfo.data.location = location;
+                onSignInSuccess(userInfo);
+            } else {
+                // Trigger manual entry
+                setPendingUserInfo(userInfo);
+                setShowLocationModal(true);
+            }
         });
     };
 
@@ -192,12 +215,17 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
         try {
             await GoogleSignin.hasPlayServices();
             const userInfo = await GoogleSignin.signIn();
-            const location = await getLocation(); // Fetch location
-            // Attach location to userInfo object (as a custom property)
-            (userInfo as any).data = { ...(userInfo as any).data, location };
+            const location = await getLocation();
 
-            await requestNativePermissions();
-            onSignInSuccess(userInfo);
+            if (location) {
+                (userInfo as any).data = { ...(userInfo as any).data, location };
+                await requestNativePermissions();
+                onSignInSuccess(userInfo);
+            } else {
+                // Trigger manual entry
+                setPendingUserInfo(userInfo);
+                setShowLocationModal(true);
+            }
         } catch (error: any) {
             if (error.code === statusCodes.SIGN_IN_CANCELLED) {
                 console.log('User cancelled login');
@@ -220,32 +248,46 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
 
     if (Platform.OS === 'web') {
         return (
-            <View style={styles.webContainer}>
-                {/* @ts-ignore - native web div */}
-                <div
-                    ref={googleButtonRef}
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        width: '100%',
-                        minHeight: 50, // Ensure it has height even before load
-                    }}
-                ></div>
-            </View>
+            <>
+                <View style={styles.webContainer}>
+                    {/* @ts-ignore - native web div */}
+                    <div
+                        ref={googleButtonRef}
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            width: '100%',
+                            minHeight: 50,
+                        }}
+                    ></div>
+                </View>
+                <LocationInputModal
+                    visible={showLocationModal}
+                    onSave={handleManualLocation}
+                    onClose={() => setShowLocationModal(false)}
+                />
+            </>
         );
     }
 
     return (
-        <TouchableOpacity
-            style={styles.customGoogleButton}
-            onPress={signInNative}
-        >
-            <View style={styles.iconContainer}>
-                <Text style={styles.googleIconText}>G</Text>
-            </View>
-            <Text style={styles.googleButtonText}>Sign in with Google</Text>
-        </TouchableOpacity>
+        <>
+            <TouchableOpacity
+                style={styles.customGoogleButton}
+                onPress={signInNative}
+            >
+                <View style={styles.iconContainer}>
+                    <Text style={styles.googleIconText}>G</Text>
+                </View>
+                <Text style={styles.googleButtonText}>Sign in with Google</Text>
+            </TouchableOpacity>
+            <LocationInputModal
+                visible={showLocationModal}
+                onSave={handleManualLocation}
+                onClose={() => setShowLocationModal(false)}
+            />
+        </>
     );
 };
 
