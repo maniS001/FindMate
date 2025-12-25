@@ -43,6 +43,24 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
             const finalUserInfo = { ...pendingUserInfo };
             if (!finalUserInfo.data) finalUserInfo.data = {};
             finalUserInfo.data.location = location;
+            // Note: Manual entry doesn't have coordinates, only string location
+
+            // For native, we still want to ask other permissions if we haven't yet
+            if (Platform.OS !== 'web') requestNativePermissions();
+
+            onSignInSuccess(finalUserInfo);
+            setPendingUserInfo(null);
+        }
+    };
+
+    const handleLocationDetected = (locationData: { location: string; latitude: number; longitude: number }) => {
+        setShowLocationModal(false);
+        if (pendingUserInfo) {
+            const finalUserInfo = { ...pendingUserInfo };
+            if (!finalUserInfo.data) finalUserInfo.data = {};
+            finalUserInfo.data.location = locationData.location;
+            finalUserInfo.data.latitude = locationData.latitude;
+            finalUserInfo.data.longitude = locationData.longitude;
 
             // For native, we still want to ask other permissions if we haven't yet
             if (Platform.OS !== 'web') requestNativePermissions();
@@ -134,6 +152,8 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
             data: {
                 idToken: response.credential,
                 location: null as string | null,
+                latitude: undefined as number | undefined,
+                longitude: undefined as number | undefined,
                 user: {
                     email: 'google-user@example.com',
                     name: 'Google User',
@@ -142,9 +162,11 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
         };
 
         // Try auto location first
-        getLocation().then(location => {
-            if (location) {
-                userInfo.data.location = location;
+        getLocation().then(locationData => {
+            if (locationData) {
+                userInfo.data.location = locationData.location;
+                userInfo.data.latitude = locationData.latitude;
+                userInfo.data.longitude = locationData.longitude;
                 onSignInSuccess(userInfo);
             } else {
                 // Trigger manual entry
@@ -154,7 +176,7 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
         });
     };
 
-    const getLocation = async () => {
+    const getLocation = async (): Promise<{ location: string; latitude: number; longitude: number } | null> => {
         try {
             // Web: Check if geolocation is available first to avoid errors
             if (Platform.OS === 'web' && !navigator.geolocation) {
@@ -168,24 +190,31 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
                 return null;
             }
 
-            let location = await Location.getCurrentPositionAsync({});
+            let position = await Location.getCurrentPositionAsync({});
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
 
             // On Web, reverseGeocodeAsync might be deprecated/flaky. 
             // We'll wrap it in a separate try-catch to not fail the whole location fetch.
             if (Platform.OS !== 'web') {
                 let reverseGeocode = await Location.reverseGeocodeAsync({
-                    latitude: location.coords.latitude,
-                    longitude: location.coords.longitude
+                    latitude,
+                    longitude
                 });
 
                 if (reverseGeocode.length > 0) {
                     const address = reverseGeocode[0];
-                    return `${address.city || address.region || ''}, ${address.district || address.name || ''}`;
+                    const locationString = `${address.city || address.region || ''}, ${address.district || address.name || ''}`;
+                    return { location: locationString, latitude, longitude };
                 }
             } else {
                 // Web-specific or skip reverse geocoding to avoid warning
-                return `${location.coords.latitude.toFixed(2)}, ${location.coords.longitude.toFixed(2)}`;
+                const locationString = `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
+                return { location: locationString, latitude, longitude };
             }
+
+            // Fallback if reverse geocoding fails but we have coordinates
+            return { location: `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`, latitude, longitude };
 
         } catch (error) {
             console.log('Error getting location (ignoring to allow login):', error);
@@ -215,10 +244,15 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
         try {
             await GoogleSignin.hasPlayServices();
             const userInfo = await GoogleSignin.signIn();
-            const location = await getLocation();
+            const locationData = await getLocation();
 
-            if (location) {
-                (userInfo as any).data = { ...(userInfo as any).data, location };
+            if (locationData) {
+                (userInfo as any).data = {
+                    ...(userInfo as any).data,
+                    location: locationData.location,
+                    latitude: locationData.latitude,
+                    longitude: locationData.longitude
+                };
                 await requestNativePermissions();
                 onSignInSuccess(userInfo);
             } else {
@@ -266,6 +300,7 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
                     visible={showLocationModal}
                     onSave={handleManualLocation}
                     onClose={() => setShowLocationModal(false)}
+                    onLocationDetected={handleLocationDetected}
                 />
             </>
         );
@@ -286,6 +321,7 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
                 visible={showLocationModal}
                 onSave={handleManualLocation}
                 onClose={() => setShowLocationModal(false)}
+                onLocationDetected={handleLocationDetected}
             />
         </>
     );

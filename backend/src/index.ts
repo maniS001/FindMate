@@ -18,6 +18,18 @@ const JWT_SECRET = process.env.JWT_SECRET || 'GOCSPX-AnJHNKKa0VYTR_1dbYfu1pWNHhK
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// Helper function to calculate distance between two coordinates (Haversine formula)
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
 // Middleware to authenticate token
 const authenticateToken = (req: any, res: any, next: any) => {
     const authHeader = req.headers['authorization'];
@@ -84,7 +96,7 @@ const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 app.post('/api/auth/google', async (req, res) => {
     try {
-        const { idToken, location } = req.body;
+        const { idToken, location, latitude, longitude } = req.body;
 
         if (!idToken) {
             return res.status(400).json({ error: 'ID Token is required' });
@@ -117,13 +129,15 @@ app.post('/api/auth/google', async (req, res) => {
                         email,
                         name: name || 'Google User',
                         googleId,
-                        location, // Save location
-                        password: '' // No password for Google users
+                        location,
+                        latitude,
+                        longitude,
+                        password: ''
                     },
                 });
             } catch (createError) {
                 console.warn('Failed to save location (DB schema might be outdated). Retrying without location.');
-                // Fallback: Create without location
+                // Fallback: Create without location data
                 user = await prisma.user.create({
                     data: {
                         email,
@@ -138,22 +152,22 @@ app.post('/api/auth/google', async (req, res) => {
             try {
                 user = await prisma.user.update({
                     where: { id: user.id },
-                    data: { googleId, location }, // Update location if provided
+                    data: { googleId, location, latitude, longitude },
                 });
             } catch (updateError) {
-                console.warn('Failed to update location. Retrying without location.');
+                console.warn('Failed to update location. Retrying without location data.');
                 user = await prisma.user.update({
                     where: { id: user.id },
                     data: { googleId },
                 });
             }
         } else {
-            // User exists and is linked. Update location if possible.
+            // User exists and is linked. Update location if provided.
             try {
-                if (location) {
+                if (location || latitude || longitude) {
                     await prisma.user.update({
                         where: { id: user.id },
-                        data: { location }
+                        data: { location, latitude, longitude }
                     });
                 }
             } catch (ignore) {
@@ -302,25 +316,50 @@ app.post('/api/complaints', async (req, res) => {
         });
         res.json(complaint);
 
-        // Find users in the same location and notify them
+        // Find users within 100km radius and notify them
         if (location) {
             try {
-                // Simple case-insensitive exact string match or substring match
-                // In a real app, use geospatial queries (PostGIS) or improved fuzzy matching
-                const usersInLocation = await prisma.user.findMany({
+                // Get all users (we'll filter by distance in memory)
+                const allUsers = await prisma.user.findMany({
                     where: {
-                        location: {
-                            contains: location,
-                            mode: 'insensitive',
-                        },
                         NOT: {
                             id: userId || 'unknown-id', // Don't notify the one who filed it
                         }
                     }
                 });
 
-                if (usersInLocation.length > 0) {
-                    const notifications = usersInLocation.map(user => ({
+                // Get complaint coordinates if available (from user who filed it)
+                const complaintUser = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null;
+                const complaintLat = complaintUser?.latitude;
+                const complaintLon = complaintUser?.longitude;
+
+                let usersInRadius: any[] = [];
+
+                if (complaintLat && complaintLon) {
+                    // Use coordinate-based matching (100km radius)
+                    usersInRadius = allUsers.filter(user => {
+                        if (user.latitude && user.longitude) {
+                            const distance = calculateDistance(
+                                complaintLat,
+                                complaintLon,
+                                user.latitude,
+                                user.longitude
+                            );
+                            return distance <= 100; // 100km radius
+                        }
+                        return false;
+                    });
+                    console.log(`Found ${usersInRadius.length} users within 100km radius`);
+                } else {
+                    // Fallback to string matching if no coordinates available
+                    usersInRadius = allUsers.filter(user =>
+                        user.location && user.location.toLowerCase().includes(location.toLowerCase())
+                    );
+                    console.log(`Used fallback string matching, found ${usersInRadius.length} users`);
+                }
+
+                if (usersInRadius.length > 0) {
+                    const notifications = usersInRadius.map(user => ({
                         userId: user.id,
                         title: 'New Complaint in Your Area',
                         message: `Someone lost a "${name}" in ${location}. Check if you can help!`,
