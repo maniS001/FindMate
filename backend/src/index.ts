@@ -30,6 +30,31 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
     return R * c;
 }
 
+// Helper function to send push notification via Expo
+async function sendPushNotification(pushToken: string, title: string, body: string, data?: any) {
+    const message = {
+        to: pushToken,
+        sound: 'default',
+        title,
+        body,
+        data: data || {},
+    };
+
+    try {
+        await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(message),
+        });
+        console.log(`Push notification sent to ${pushToken.substring(0, 20)}...`);
+    } catch (error) {
+        console.error('Error sending push notification:', error);
+    }
+}
+
 // Middleware to authenticate token
 const authenticateToken = (req: any, res: any, next: any) => {
     const authHeader = req.headers['authorization'];
@@ -70,13 +95,25 @@ app.post('/api/auth/signup', async (req, res) => {
 // Login
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, pushToken } = req.body;
         const user = await prisma.user.findUnique({ where: { email } });
 
         if (!user || !user.password) return res.status(400).json({ error: 'Invalid credentials' });
 
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
+
+        // Update push token if provided
+        if (pushToken) {
+            try {
+                await prisma.user.update({
+                    where: { id: user.id },
+                    data: { pushToken },
+                });
+            } catch (err) {
+                console.warn('Failed to update push token:', err);
+            }
+        }
 
         const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET);
         res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
@@ -96,7 +133,7 @@ const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 app.post('/api/auth/google', async (req, res) => {
     try {
-        const { idToken, location, latitude, longitude } = req.body;
+        const { idToken, location, latitude, longitude, pushToken } = req.body;
 
         if (!idToken) {
             return res.status(400).json({ error: 'ID Token is required' });
@@ -132,6 +169,7 @@ app.post('/api/auth/google', async (req, res) => {
                         location,
                         latitude,
                         longitude,
+                        pushToken,
                         password: ''
                     },
                 });
@@ -152,7 +190,7 @@ app.post('/api/auth/google', async (req, res) => {
             try {
                 user = await prisma.user.update({
                     where: { id: user.id },
-                    data: { googleId, location, latitude, longitude },
+                    data: { googleId, location, latitude, longitude, pushToken },
                 });
             } catch (updateError) {
                 console.warn('Failed to update location. Retrying without location data.');
@@ -164,10 +202,10 @@ app.post('/api/auth/google', async (req, res) => {
         } else {
             // User exists and is linked. Update location if provided.
             try {
-                if (location || latitude || longitude) {
+                if (location || latitude || longitude || pushToken) {
                     await prisma.user.update({
                         where: { id: user.id },
-                        data: { location, latitude, longitude }
+                        data: { location, latitude, longitude, pushToken }
                     });
                 }
             } catch (ignore) {

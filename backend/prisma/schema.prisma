@@ -15,6 +15,7 @@ model User {
   location    String?  // User's current location (e.g. "Chennai")
   latitude    Float?   // Latitude coordinate for radius-based notifications
   longitude   Float?   // Longitude coordinate for radius-based notifications
+  pushToken   String?  // Expo push notification token
   googleId    String?  @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

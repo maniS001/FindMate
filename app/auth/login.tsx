@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -26,10 +27,13 @@ export default function Login() {
 
         setLoading(true);
         try {
+            // Get push token from storage
+            const pushToken = await AsyncStorage.getItem('expoPushToken');
+
             const response = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email, password, pushToken }),
             });
 
             const data = await response.json();
@@ -46,18 +50,20 @@ export default function Login() {
     const handleGoogleLogin = async (userInfo: any) => {
         setLoading(true);
         try {
-            // Get the idToken from the Google Sign-In response
-            // Get the idToken and location from the Google Sign-In response
-            const { idToken, location } = userInfo.data;
+            // Get the idToken, location, and coordinates from the Google Sign-In response
+            const { idToken, location, latitude, longitude } = userInfo.data;
 
             if (!idToken) {
                 throw new Error('No ID token found');
             }
 
+            // Get push token from storage
+            const pushToken = await AsyncStorage.getItem('expoPushToken');
+
             const response = await fetch(`${API_URL}/auth/google`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken, location }),
+                body: JSON.stringify({ idToken, location, latitude, longitude, pushToken }),
             });
 
             const data = await response.json();

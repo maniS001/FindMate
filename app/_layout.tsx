@@ -1,5 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import { Stack, usePathname } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,11 +10,47 @@ import Header from '../components/Header';
 import WebContainer from '../components/WebContainer';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
+import { registerForPushNotificationsAsync } from '../utils/pushNotifications';
+
+// Configure notification handler
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 function RootLayoutContent() {
   const { theme, colors } = useTheme();
   const pathname = usePathname();
   const shouldHideHeader = pathname === '/auth/login';
+
+  const [expoPushToken, setExpoPushToken] = useState('');
+  const [notification, setNotification] = useState<Notifications.Notification | undefined>(undefined);
+  const notificationListener = useRef<Notifications.Subscription>();
+  const responseListener = useRef<Notifications.Subscription>();
+
+  useEffect(() => {
+    registerForPushNotificationsAsync().then(token => setExpoPushToken(token ?? ''));
+
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      setNotification(notification);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log(response);
+    });
+
+    return () => {
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
+  }, []);
 
   const navigationTheme = theme === 'dark' ? DarkTheme : DefaultTheme;
 
@@ -22,6 +60,7 @@ function RootLayoutContent() {
         <View style={{ flex: 1, backgroundColor: colors.background }}>
           {!shouldHideHeader && <Header />}
           <WebContainer>
+
             <Stack
               screenOptions={{
                 headerShown: false,
