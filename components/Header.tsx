@@ -1,8 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePathname, useRouter } from 'expo-router';
 import { ArrowLeft, Bell, Info, Menu, Settings, User } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { API_URL } from '../constants/api';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface MenuItem {
@@ -16,6 +18,33 @@ export default function Header() {
     const pathname = usePathname();
     const { colors } = useTheme();
     const [menuVisible, setMenuVisible] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    // Fetch unread count on mount and when pathname changes
+    useEffect(() => {
+        fetchUnreadCount();
+        // Poll every 30 seconds for updates
+        const interval = setInterval(fetchUnreadCount, 30000);
+        return () => clearInterval(interval);
+    }, [pathname]);
+
+    const fetchUnreadCount = async () => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            if (!token) return;
+
+            const response = await fetch(`${API_URL}/notifications/unread-count`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setUnreadCount(data.count);
+            }
+        } catch (error) {
+            console.error('Failed to fetch unread count:', error);
+        }
+    };
 
     const menuItems: MenuItem[] = [
         { icon: <User size={20} color={colors.text} />, label: 'Account Details', route: '/account' },
@@ -84,12 +113,20 @@ export default function Header() {
                         onPress={() => {
                             if (pathname !== '/notifications') {
                                 router.push('/notifications' as never);
+                                setUnreadCount(0); // Reset count when navigating to notifications
                             }
                         }}
                         style={[styles.iconButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
                         activeOpacity={0.7}
                     >
                         <Bell size={20} color={colors.headerText} />
+                        {unreadCount > 0 && (
+                            <View style={styles.badge}>
+                                <Text style={styles.badgeText}>
+                                    {unreadCount > 99 ? '99+' : unreadCount}
+                                </Text>
+                            </View>
+                        )}
                     </TouchableOpacity>
 
                     {/* Menu Button */}
@@ -178,6 +215,25 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    badge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: '#EF4444',
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        paddingHorizontal: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'white',
+    },
+    badgeText: {
+        color: 'white',
+        fontSize: 11,
+        fontWeight: '700',
     },
     modalOverlay: {
         flex: 1,

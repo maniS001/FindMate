@@ -285,6 +285,34 @@ app.get('/api/notifications', authenticateToken, async (req: any, res) => {
     }
 });
 
+// Get unread notification count
+app.get('/api/notifications/unread-count', authenticateToken, async (req: any, res) => {
+    try {
+        const count = await prisma.notification.count({
+            where: {
+                userId: req.user.id,
+                read: false
+            }
+        });
+        res.json({ count });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch unread count' });
+    }
+});
+
+// Mark notification as read
+app.patch('/api/notifications/:id/read', authenticateToken, async (req: any, res) => {
+    try {
+        const notification = await prisma.notification.update({
+            where: { id: req.params.id },
+            data: { read: true }
+        });
+        res.json(notification);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to mark notification as read' });
+    }
+});
+
 // ============= Existing Endpoints (Updated with userId optional) =============
 
 // Create Item (Updated to link user)

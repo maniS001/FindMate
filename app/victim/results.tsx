@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Calendar, ChevronRight, MapPin } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
@@ -22,6 +22,8 @@ export default function SearchResults() {
     const router = useRouter();
     const { colors } = useTheme();
     const { user } = useAuth();
+    const { width } = useWindowDimensions();
+    const numColumns = width >= 600 ? 2 : 1;
     const [results, setResults] = useState<Item[]>([]);
     const [loading, setLoading] = useState(false);
     const [filing, setFiling] = useState(false);
@@ -108,13 +110,14 @@ export default function SearchResults() {
             <TouchableOpacity
                 onPress={() => router.push(`/victim/claim/${item.id}`)}
                 activeOpacity={0.9}
+                style={styles.cardWrapper}
             >
                 <Card style={styles.itemCard}>
                     {imageUris.length > 0 ? (
                         <Image
                             source={{ uri: imageUris[0] }}
                             style={styles.itemImage}
-                            resizeMode="cover"
+                            resizeMode="contain"
                         />
                     ) : (
                         <View style={[styles.itemImage, styles.noImagePlaceholder, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -169,7 +172,10 @@ export default function SearchResults() {
                     data={results}
                     renderItem={renderItem}
                     keyExtractor={item => item.id}
+                    key={numColumns}
+                    numColumns={numColumns}
                     contentContainerStyle={styles.list}
+                    columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
                             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No items found matching your search.</Text>
@@ -219,15 +225,22 @@ const styles = StyleSheet.create({
         padding: 24,
         gap: 16,
     },
+    cardWrapper: {
+        flex: 1,
+    },
+    columnWrapper: {
+        gap: 16,
+    },
     itemImage: {
         width: '100%',
-        height: 150,
+        aspectRatio: 4 / 3,
         borderRadius: 8,
         marginBottom: 12,
         backgroundColor: '#F1F5F9',
     },
     itemCard: {
         gap: 8,
+        flex: 1,
     },
     itemHeader: {
         flexDirection: 'row',

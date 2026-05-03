@@ -225,7 +225,6 @@ export default function AccountScreen() {
                                 <Text style={[styles.actionText, { color: colors.primary }]}>Edit Report</Text>
                             </TouchableOpacity>
                         )}
-
                         <TouchableOpacity
                             style={[styles.actionButton, { backgroundColor: colors.error + '10' }]}
                             onPress={() => handleAction(complaint.id, 'CLOSE')}

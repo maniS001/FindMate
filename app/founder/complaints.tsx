@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Calendar, MapPin, Search } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../../components/Card';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -10,6 +10,8 @@ import { Complaint, getComplaints, searchComplaints } from '../../store';
 export default function ViewComplaints() {
     const router = useRouter();
     const { colors } = useTheme();
+    const { width } = useWindowDimensions();
+    const numColumns = width >= 600 ? 2 : 1;
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -67,13 +69,14 @@ export default function ViewComplaints() {
                     params: { id: item.id }
                 })}
                 activeOpacity={0.9}
+                style={styles.cardWrapper}
             >
                 <Card style={styles.card}>
                     {images.length > 0 ? (
                         <Image
                             source={{ uri: images[0] }}
                             style={styles.itemImage}
-                            resizeMode="cover"
+                            resizeMode="contain"
                         />
                     ) : (
                         <View style={[styles.itemImage, styles.noImagePlaceholder, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -166,7 +169,10 @@ export default function ViewComplaints() {
                         data={complaints}
                         renderItem={renderItem}
                         keyExtractor={item => item.id}
+                        key={numColumns}
+                        numColumns={numColumns}
                         contentContainerStyle={styles.list}
+                        columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
                         keyboardShouldPersistTaps="handled"
                         ListEmptyComponent={
                             <View style={styles.empty}>
@@ -248,13 +254,21 @@ const styles = StyleSheet.create({
         padding: 16,
         gap: 16,
     },
+    cardWrapper: {
+        flex: 1,
+    },
     card: {
         overflow: 'hidden',
+        flex: 1,
+    },
+    columnWrapper: {
+        gap: 16,
     },
     itemImage: {
         width: '100%',
-        height: 200,
+        aspectRatio: 4 / 3,
         marginBottom: 16,
+        backgroundColor: '#F1F5F9',
     },
     itemHeader: {
         flexDirection: 'row',

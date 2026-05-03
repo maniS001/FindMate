@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Calendar, MapPin, Phone } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
@@ -12,13 +12,13 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { Complaint, getComplaintById, Item, notifyOwner, updateComplaintStatus } from '../../store';
 import { showAlert } from '../../utils/alert';
 
-const { width } = Dimensions.get('window');
-const IMAGE_WIDTH = width - 48; // 24px padding on each side
-
 export default function ComplaintDetail() {
     const { id, prefillFromItemId } = useLocalSearchParams<{ id: string; prefillFromItemId?: string }>();
     const { colors } = useTheme();
     const { token } = useAuth();
+    const { width } = useWindowDimensions();
+    // 24px padding on each side of ScrollView (48) + 16px padding on each side of Card (32) = 80px
+    const IMAGE_WIDTH = Math.min(width - 80, 800); // cap max width for large screens
     const router = useRouter();
     const [complaint, setComplaint] = useState<Complaint | null>(null);
     const [loading, setLoading] = useState(true);
@@ -136,8 +136,8 @@ export default function ComplaintDetail() {
                                     <Image
                                         key={index}
                                         source={{ uri }}
-                                        style={styles.scrollImage}
-                                        resizeMode="cover"
+                                        style={[styles.scrollImage, { width: IMAGE_WIDTH }]}
+                                        resizeMode="contain"
                                     />
                                 ))}
                             </ScrollView>
@@ -246,13 +246,15 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         borderRadius: 16,
         overflow: 'hidden',
+        alignItems: 'center', // Centers the 800px container if the card is wider
     },
     imageScrollContent: {
         gap: 0,
     },
     scrollImage: {
-        width: IMAGE_WIDTH,
-        height: 300,
+        aspectRatio: 4 / 3,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 8,
     },
     pagination: {
         position: 'absolute',

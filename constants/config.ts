@@ -13,7 +13,6 @@ export const CONFIG = {
 
     // SMS OTP
     SMS_OTP_ENABLED: APP_CONFIG.FEATURES.SMS_OTP_ENABLED,
-} as const; // 'SANDBOX' | 'PRODUCTION'
-MERCHANT_VPA: 'merchant@upi', // Replace with real VPA in production
+    MERCHANT_VPA: 'merchant@upi', // Replace with real VPA in production
     MERCHANT_NAME: 'FindMate Services',
-};
+} as const;
