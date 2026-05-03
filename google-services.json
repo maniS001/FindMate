@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1018607704367",
+    "firebase_url": "https://stproject-1dbc9.firebaseio.com",
+    "project_id": "stproject-1dbc9",
+    "storage_bucket": "stproject-1dbc9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1018607704367:android:458fd1820d5683b8b7a9da",
+        "android_client_info": {
+          "package_name": "com.manikandan.findmate"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfBd_6W9AndpyPJW0gPsBUvlyiG21UWjc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
