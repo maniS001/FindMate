@@ -1,119 +1,119 @@
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { API_URL } from '../constants/api';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import Button from './Button';
 import Input from './Input';
 
-import { API_URL } from '../constants/api';
-
 interface OtpModalProps {
     visible: boolean;
     onClose: () => void;
-    onVerified: () => void;
+    onVerified: (phone: string) => void; // Now returns the verified phone number
 }
 
 export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps) {
     const { colors } = useTheme();
+    const { token } = useAuth();
     const [step, setStep] = useState<'phone' | 'otp'>('phone');
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
     const [timer, setTimer] = useState(0);
     const [message, setMessage] = useState<string | null>(null);
+    const [isError, setIsError] = useState(false);
+    // Firebase confirmation result (used to verify OTP)
+    const [confirmation, setConfirmation] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
 
     useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
         if (timer > 0) {
-            interval = setInterval(() => {
-                setTimer((prev) => prev - 1);
-            }, 1000);
+            interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
         }
         return () => clearInterval(interval);
     }, [timer]);
 
+    const showMessage = (msg: string, error = false) => {
+        setMessage(msg);
+        setIsError(error);
+    };
+
+    // Step 1: Send OTP via Firebase
     const handleSendOtp = async () => {
-        if (phone.length < 10) {
-            setMessage('Please enter a valid phone number');
+        const trimmedPhone = phone.trim();
+        // Basic validation - must start with + for international format
+        if (!trimmedPhone.startsWith('+') || trimmedPhone.length < 10) {
+            showMessage('Enter number with country code. Example: +91 9876543210', true);
             return;
         }
         setLoading(true);
         try {
-            const response = await fetch(`${API_URL}/otp/send`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone }),
-            });
-            const data = await response.json();
-
-            if (!response.ok) throw new Error(data.error || 'Failed to send OTP');
-
+            const confirmationResult = await auth().signInWithPhoneNumber(trimmedPhone);
+            setConfirmation(confirmationResult);
             setStep('otp');
             setTimer(60);
-
-            // Show OTP message
-            setTimeout(() => {
-                if (data.debugCode) {
-                    setMessage(`OTP Sent! Code: ${data.debugCode}`);
-                } else {
-                    setMessage('OTP sent to your phone.');
-                }
-            }, 100);
+            showMessage('OTP sent to your phone!', false);
         } catch (error: any) {
-            setMessage(error.message);
+            console.error('Firebase OTP send error:', error);
+            showMessage(error.message || 'Failed to send OTP. Check the phone number.', true);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleResendOtp = async () => {
-        setLoading(true);
-        try {
-            const response = await fetch(`${API_URL}/otp/send`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone }),
-            });
-            const data = await response.json();
-
-            if (!response.ok) throw new Error(data.error || 'Failed to resend OTP');
-
-            setTimer(60);
-
-            if (data.debugCode) {
-                setMessage(`OTP Resent! Code: ${data.debugCode}`);
-            } else {
-                setMessage('New OTP sent to your phone.');
-            }
-        } catch (error: any) {
-            setMessage(error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Step 2: Verify OTP with Firebase
     const handleVerifyOtp = async () => {
         if (otp.length !== 6) {
-            setMessage('Please enter a valid 6-digit OTP');
+            showMessage('Please enter the 6-digit OTP', true);
+            return;
+        }
+        if (!confirmation) {
+            showMessage('Session expired. Please resend OTP.', true);
             return;
         }
         setLoading(true);
         try {
-            const response = await fetch(`${API_URL}/otp/verify`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, code: otp }),
-            });
-            const data = await response.json();
+            // Confirm OTP with Firebase
+            await confirmation.confirm(otp);
 
-            if (!response.ok) throw new Error(data.error || 'Invalid OTP');
+            // OTP verified! Now save the phone number to our backend for security records.
+            const trimmedPhone = phone.trim();
+            if (token) {
+                try {
+                    await fetch(`${API_URL}/auth/save-phone`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({ phone: trimmedPhone }),
+                    });
+                } catch (saveErr) {
+                    // Non-critical: log but don't block the user
+                    console.warn('Could not save phone to backend:', saveErr);
+                }
+            }
 
-            onVerified();
-            handleClose();
+            showMessage('✅ Phone verified successfully!', false);
+            setTimeout(() => {
+                onVerified(trimmedPhone);
+                handleClose();
+            }, 800);
         } catch (error: any) {
-            setMessage(error.message);
+            console.error('Firebase OTP verify error:', error);
+            showMessage('Invalid OTP. Please try again.', true);
         } finally {
             setLoading(false);
         }
+    };
+
+    // Resend OTP
+    const handleResend = async () => {
+        setOtp('');
+        setConfirmation(null);
+        showMessage('', false);
+        await handleSendOtp();
     };
 
     const handleClose = () => {
@@ -122,6 +122,8 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
         setOtp('');
         setTimer(0);
         setMessage(null);
+        setIsError(false);
+        setConfirmation(null);
         onClose();
     };
 
@@ -136,28 +138,38 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
             <View style={styles.overlay}>
                 <View style={[styles.modal, { backgroundColor: colors.surface }]}>
                     <Text style={[styles.title, { color: colors.text }]}>
-                        {step === 'phone' ? 'Phone Verification' : 'Enter OTP'}
+                        {step === 'phone' ? '📱 Phone Verification' : '🔑 Enter OTP'}
                     </Text>
                     <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                         {step === 'phone'
-                            ? 'We need to verify your phone number before you can report an item.'
-                            : `Enter the code sent to ${phone}`}
+                            ? 'For security, we need to verify your phone number before you can claim an item. Your number will be saved securely.'
+                            : `Enter the 6-digit code sent to ${phone}`}
                     </Text>
 
-                    {message && (
-                        <View style={{ padding: 8, backgroundColor: colors.primary + '10', borderRadius: 8, marginBottom: 8 }}>
-                            <Text style={{ color: colors.primary, textAlign: 'center' }}>{message}</Text>
+                    {message ? (
+                        <View style={[
+                            styles.messageBanner,
+                            { backgroundColor: isError ? '#FEE2E2' : '#D1FAE5' }
+                        ]}>
+                            <Text style={{ color: isError ? '#DC2626' : '#065F46', textAlign: 'center', fontSize: 14 }}>
+                                {message}
+                            </Text>
                         </View>
-                    )}
+                    ) : null}
 
                     {step === 'phone' ? (
-                        <Input
-                            label="Phone Number"
-                            placeholder="e.g. 9876543210"
-                            keyboardType="phone-pad"
-                            value={phone}
-                            onChangeText={setPhone}
-                        />
+                        <View>
+                            <Input
+                                label="Phone Number"
+                                placeholder="+91 9876543210"
+                                keyboardType="phone-pad"
+                                value={phone}
+                                onChangeText={setPhone}
+                            />
+                            <Text style={[styles.hint, { color: colors.textSecondary }]}>
+                                ℹ️ Include your country code (e.g. +91 for India)
+                            </Text>
+                        </View>
                     ) : (
                         <View>
                             <Input
@@ -174,7 +186,7 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
                                         Resend code in {formatTime(timer)}
                                     </Text>
                                 ) : (
-                                    <TouchableOpacity onPress={handleResendOtp} disabled={loading}>
+                                    <TouchableOpacity onPress={handleResend} disabled={loading}>
                                         <Text style={[styles.resendText, { color: colors.primary }]}>
                                             Resend OTP
                                         </Text>
@@ -224,7 +236,17 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 14,
         textAlign: 'center',
-        marginBottom: 8,
+        lineHeight: 20,
+        marginBottom: 4,
+    },
+    messageBanner: {
+        padding: 12,
+        borderRadius: 10,
+    },
+    hint: {
+        fontSize: 12,
+        marginTop: 6,
+        marginLeft: 2,
     },
     actions: {
         flexDirection: 'row',

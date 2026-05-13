@@ -225,7 +225,27 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
-// Get Current User Profile & History
+// Save Firebase-Verified Phone Number
+// Called by the app AFTER Firebase successfully verifies the OTP on the device.
+// The backend trusts that Firebase already authenticated the phone number.
+app.post('/api/auth/save-phone', authenticateToken, async (req: any, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) return res.status(400).json({ error: 'Phone number is required' });
+
+        const userId = req.user.id;
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: { phone },
+        });
+
+        res.json({ success: true, phone: updatedUser.phone });
+    } catch (error) {
+        console.error('Save phone error:', error);
+        res.status(500).json({ error: 'Failed to save phone number' });
+    }
+});
+
 app.get('/api/auth/me', authenticateToken, async (req: any, res) => {
     try {
         const user = await prisma.user.findUnique({

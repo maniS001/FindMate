@@ -46,6 +46,7 @@ export default function ClaimItem() {
 
     const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
     const [isOtpVerified, setIsOtpVerified] = useState(false);
+    const [verifiedPhone, setVerifiedPhone] = useState('');
     const [showOtpModal, setShowOtpModal] = useState(false);
 
     if (loading) {
@@ -75,8 +76,9 @@ export default function ClaimItem() {
         }
     };
 
-    const handleOtpVerified = () => {
+    const handleOtpVerified = (phone: string) => {
         setIsOtpVerified(true);
+        setVerifiedPhone(phone);
         setShowOtpModal(false);
     };
 
