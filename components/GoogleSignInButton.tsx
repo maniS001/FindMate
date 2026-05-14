@@ -9,7 +9,7 @@ import { Alert, PermissionsAndroid, Platform, StyleSheet, Text, TouchableOpacity
 import { LocationInputModal } from './LocationInputModal';
 
 // Hardcoded Web Client ID
-const WEB_CLIENT_ID = "563053075136-a3q0elaisf04r5voakv5260gvo08qkv4.apps.googleusercontent.com";
+const WEB_CLIENT_ID = "1018607704367-f06382f0qcukig28se4gk803ndn3a3i6.apps.googleusercontent.com";
 
 // Only configure if NOT on web, or catch potential errors if library tries to run on web
 if (Platform.OS !== 'web') {

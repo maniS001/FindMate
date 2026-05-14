@@ -13,7 +13,20 @@
           "package_name": "com.manikandan.findmate"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1018607704367-i0cqp73k316t2a33spbpl2lcrh7oi7o1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.manikandan.findmate",
+            "certificate_hash": "af041ef823152a7dbd7a292558f4af6e4e99c732"
+          }
+        },
+        {
+          "client_id": "1018607704367-f06382f0qcukig28se4gk803ndn3a3i6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBfBd_6W9AndpyPJW0gPsBUvlyiG21UWjc"
@@ -21,7 +34,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1018607704367-f06382f0qcukig28se4gk803ndn3a3i6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

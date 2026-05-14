@@ -126,6 +126,28 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+// Save Phone Number (after Firebase OTP verification)
+app.post('/api/auth/save-phone', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { phone } = req.body;
+        const userId = req.user.id;
+
+        if (!phone) {
+            return res.status(400).json({ error: 'Phone number is required' });
+        }
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { phone },
+        });
+
+        res.json({ message: 'Phone number saved successfully' });
+    } catch (error) {
+        console.error('Error saving phone number:', error);
+        res.status(500).json({ error: 'Failed to save phone number' });
+    }
+});
+
 // Google Login (Real Implementation)
 // Google Login (Real Implementation)
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
