@@ -388,9 +388,38 @@ app.post('/api/items', async (req, res) => {
         // Check for matching complaints
         const matches = await findMatchingComplaints({ name, category, location, date }, prisma);
 
-        // Create notification for matching complaints (Mock logic for now)
-        // In real app, we'd find the user of the complaint and notify them
+        // Create notification for matching complaints
+        if (matches.length > 0) {
+            for (const match of matches) {
+                const complaint = match.complaint;
+                if (complaint.userId) {
+                    const complaintUser = await prisma.user.findUnique({ where: { id: complaint.userId } });
+                    
+                    if (complaintUser) {
+                        // 1. Save notification to database
+                        await prisma.notification.create({
+                            data: {
+                                userId: complaintUser.id,
+                                title: 'Possible Match Found!',
+                                message: `Someone found a "${item.name}" that might be yours!`,
+                                type: 'MATCH_ALERT',
+                                payload: JSON.stringify({ itemId: item.id, complaintId: complaint.id }),
+                            }
+                        });
 
+                        // 2. Send Expo Push Notification
+                        if (complaintUser.pushToken) {
+                            await sendPushNotification(
+                                complaintUser.pushToken,
+                                'Possible Match Found! 🎉',
+                                `Someone found a "${item.name}" that matches your complaint. Check it out now!`,
+                                { itemId: item.id, url: `/victim/claim/${item.id}` }
+                            );
+                        }
+                    }
+                }
+            }
+        }
         res.json({
             item,
             matches: matches.map(m => ({
@@ -478,6 +507,18 @@ app.post('/api/complaints', async (req, res) => {
                     await prisma.notification.createMany({
                         data: notifications
                     });
+                    
+                    // Actually trigger the push notifications!
+                    for (const user of usersInRadius) {
+                        if (user.pushToken) {
+                            await sendPushNotification(
+                                user.pushToken,
+                                'New Complaint in Your Area',
+                                `Someone lost a "${name}" in ${location}. Check if you can help!`,
+                                { complaintId: complaint.id, location }
+                            );
+                        }
+                    }
                     console.log(`Sent ${notifications.length} location-based notifications.`);
                 }
             } catch (notifyError) {

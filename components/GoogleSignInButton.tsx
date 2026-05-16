@@ -243,6 +243,14 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
     const signInNative = async () => {
         try {
             await GoogleSignin.hasPlayServices();
+            
+            // Force account picker to show every time by signing out first
+            try {
+                await GoogleSignin.signOut();
+            } catch (e) {
+                // Ignore errors if they weren't signed in previously
+            }
+
             const userInfo = await GoogleSignin.signIn();
             const locationData = await getLocation();
 

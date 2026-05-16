@@ -32,7 +32,14 @@ function RootLayoutContent() {
   const responseListener = useRef<Notifications.Subscription>();
 
   useEffect(() => {
-    registerForPushNotificationsAsync().then(token => setExpoPushToken(token ?? ''));
+    registerForPushNotificationsAsync().then(async token => {
+      setExpoPushToken(token ?? '');
+      if (token) {
+        // Save to AsyncStorage so login/signup can access it
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        await AsyncStorage.setItem('expoPushToken', token);
+      }
+    });
 
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       setNotification(notification);
