@@ -797,6 +797,16 @@ app.patch('/api/complaints/:id', async (req, res) => {
                                 }
                             });
                             console.log(`Created reopen notification for founder ${item.userId}`);
+
+                            // Send Push Notification
+                            const founderUser = await prisma.user.findUnique({ where: { id: item.userId } });
+                            if (founderUser && founderUser.pushToken) {
+                                await sendPushNotification(
+                                    founderUser.pushToken,
+                                    'Complaint Reopened ⚠️',
+                                    `The victim has reopened their complaint "${currentComplaint.name}". ${reopenReason || ''}`
+                                );
+                            }
                         }
                         break;
                     }
@@ -859,17 +869,29 @@ app.post('/api/complaints/:id/resolve', authenticateToken, async (req: any, res)
 
                     // Notify founder about successful recovery
                     if (item && item.userId) {
+                        const messageText = `The victim has confirmed recovering "${complaint.name}". Thank you for helping!` +
+                            (rating ? ` Rating: ${rating}/5` : '') +
+                            (comment ? ` Feedback: "${comment}"` : '');
+
                         await prisma.notification.create({
                             data: {
                                 userId: item.userId,
                                 title: 'Item Successfully Recovered! 🎉',
-                                message: `The victim has confirmed recovering "${complaint.name}". Thank you for helping!` +
-                                    (rating ? ` Rating: ${rating}/5` : '') +
-                                    (comment ? ` Feedback: "${comment}"` : ''),
+                                message: messageText,
                                 type: 'ITEM_RECOVERED',
                                 payload: JSON.stringify({ complaintId: id, itemId: payload.itemId, rating, comment }),
                             }
                         });
+
+                        // Send Push Notification
+                        const founderUser = await prisma.user.findUnique({ where: { id: item.userId } });
+                        if (founderUser && founderUser.pushToken) {
+                            await sendPushNotification(
+                                founderUser.pushToken,
+                                'Item Successfully Recovered! 🎉',
+                                messageText
+                            );
+                        }
                     }
                     break;
                 }
