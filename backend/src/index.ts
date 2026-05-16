@@ -1005,6 +1005,16 @@ app.post('/api/complaints/:id/notify', authenticateToken, async (req: any, res) 
             console.log('Notification created:', notification);
         }
 
+        // --- ADDED: Send Expo Push Notification to the Victim ---
+        const victimUser = await prisma.user.findUnique({ where: { id: complaint.userId } });
+        if (victimUser && victimUser.pushToken) {
+            await sendPushNotification(
+                victimUser.pushToken,
+                'Someone found your item! 🎉',
+                `A founder has reached out regarding '${complaint.name}'. Open the app to view their message and claim your item.`
+            );
+        }
+
         res.json({ success: true, itemId: finalItemId });
     } catch (error: any) {
         console.error('Error in notify endpoint:', error);

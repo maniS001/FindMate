@@ -147,31 +147,14 @@ export default function ClaimItem() {
                 <ScrollView contentContainerStyle={styles.content}>
                     <Card>
                         {images.length > 0 && (
-                            <View style={styles.imageContainer}>
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={styles.imageScrollContent}
-                                    snapToInterval={IMAGE_WIDTH}
-                                    decelerationRate="fast"
-                                    pagingEnabled={false}
-                                >
-                                    {images.map((uri: string, index: number) => (
-                                        <Image
-                                            key={index}
-                                            source={{ uri }}
-                                            style={[styles.scrollImage, { width: IMAGE_WIDTH }]}
-                                            resizeMode="contain"
-                                        />
-                                    ))}
-                                </ScrollView>
-                                {images.length > 1 && (
-                                    <View style={styles.pagination}>
-                                        <Text style={styles.paginationText}>
-                                            Swipe to see more photos ({images.length})
-                                        </Text>
-                                    </View>
-                                )}
+                            <View style={[styles.imageContainer, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12 }]}>
+                                <Text style={{ fontSize: 40, marginBottom: 12 }}>🔒</Text>
+                                <Text style={[{ color: colors.text, fontSize: 16, fontWeight: 'bold', marginBottom: 4 }]}>
+                                    Secure Item
+                                </Text>
+                                <Text style={[{ color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 }]}>
+                                    You must successfully answer the security questions to reveal this item's details.
+                                </Text>
                             </View>
                         )}
 

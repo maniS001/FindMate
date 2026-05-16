@@ -114,11 +114,14 @@ export default function SearchResults() {
             >
                 <Card style={styles.itemCard}>
                     {imageUris.length > 0 ? (
-                        <Image
-                            source={{ uri: imageUris[0] }}
-                            style={styles.itemImage}
-                            resizeMode="contain"
-                        />
+                        <View style={[styles.itemImage, styles.noImagePlaceholder, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                                <Text style={{ fontSize: 24, marginBottom: 4 }}>🔒</Text>
+                                <Text style={[styles.noImageText, { color: colors.textSecondary, textAlign: 'center' }]}>
+                                    Image hidden for security
+                                </Text>
+                            </View>
+                        </View>
                     ) : (
                         <View style={[styles.itemImage, styles.noImagePlaceholder, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                             <Text style={[styles.noImageText, { color: colors.textSecondary }]}>No Image</Text>
