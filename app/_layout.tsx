@@ -46,7 +46,12 @@ function RootLayoutContent() {
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log(response);
+      console.log('Notification tapped:', response);
+      const url = response.notification.request.content.data?.url;
+      if (url && typeof url === 'string') {
+        const { router } = require('expo-router');
+        router.push(url);
+      }
     });
 
     return () => {
