@@ -59,11 +59,12 @@ export default function Header() {
         }
     };
 
-    const hideHeaderRoutes = ['/account', '/settings', '/about', '/notifications'];
+    const hideHeaderRoutes = ['/auth/signup', '/account', '/settings', '/about', '/notifications'];
     if (hideHeaderRoutes.includes(pathname)) return null;
 
     return (
         <SafeAreaView edges={['top']} style={{ backgroundColor: colors.headerBackground }}>
+
             <View style={[styles.header, { backgroundColor: colors.headerBackground, borderBottomColor: colors.headerBackground }]}>
                 <View style={styles.leftSection}>
                     {pathname === '/' && (
@@ -173,6 +174,7 @@ export default function Header() {
                     </TouchableOpacity>
                 </Modal>
             </View>
+
         </SafeAreaView>
     );
 }

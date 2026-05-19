@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import express from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
+import svgCaptcha from 'svg-captcha';
+import { v4 as uuidv4 } from 'uuid';
 import { findMatchingComplaints } from './matching';
 
 // Load environment variables
@@ -68,6 +70,52 @@ const authenticateToken = (req: any, res: any, next: any) => {
         next();
     });
 };
+
+// ============= In-Memory CAPTCHA Store =============
+// Stores { text, expiresAt } keyed by captchaId
+const captchaStore = new Map<string, { text: string; expiresAt: number }>();
+
+// Clean up expired captchas every 10 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, captcha] of captchaStore.entries()) {
+        if (captcha.expiresAt < now) captchaStore.delete(id);
+    }
+}, 10 * 60 * 1000);
+
+// ============= CAPTCHA Endpoints =============
+
+// Generate CAPTCHA
+app.get('/api/captcha/generate', (req, res) => {
+    const captcha = svgCaptcha.createMathExpr({
+        noise: 1,
+        mathMin: 1,
+        mathMax: 9,
+        mathOperator: '+',
+        color: true,
+        background: '#1a1a2e',
+    });
+    const captchaId = uuidv4();
+    // Store the answer, expire in 5 minutes
+    captchaStore.set(captchaId, { text: captcha.text, expiresAt: Date.now() + 5 * 60 * 1000 });
+    // Return the SVG as a data URI so mobile can render it as an <Image>
+    const svgBase64 = Buffer.from(captcha.data).toString('base64');
+    res.json({ captchaId, svgBase64 });
+});
+
+// Verify CAPTCHA
+app.post('/api/captcha/verify', (req, res) => {
+    const { captchaId, answer } = req.body;
+    const stored = captchaStore.get(captchaId);
+    if (!stored) return res.status(400).json({ valid: false, error: 'CAPTCHA expired or not found. Please refresh.' });
+    if (Date.now() > stored.expiresAt) {
+        captchaStore.delete(captchaId);
+        return res.status(400).json({ valid: false, error: 'CAPTCHA expired. Please refresh.' });
+    }
+    const isValid = String(answer).trim() === String(stored.text).trim();
+    if (isValid) captchaStore.delete(captchaId); // Single-use
+    res.json({ valid: isValid });
+});
 
 // ============= Auth Endpoints =============
 
