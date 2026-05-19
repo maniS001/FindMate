@@ -1,6 +1,6 @@
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { useEffect, useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { API_URL } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,7 +10,7 @@ import Input from './Input';
 interface OtpModalProps {
     visible: boolean;
     onClose: () => void;
-    onVerified: (phone: string) => void; // Now returns the verified phone number
+    onVerified: (phone: string) => void;
 }
 
 export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps) {
@@ -23,7 +23,6 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
     const [timer, setTimer] = useState(0);
     const [message, setMessage] = useState<string | null>(null);
     const [isError, setIsError] = useState(false);
-    // Firebase confirmation result (used to verify OTP)
     const [confirmation, setConfirmation] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
 
     useEffect(() => {
@@ -39,10 +38,8 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
         setIsError(error);
     };
 
-    // Step 1: Send OTP via Firebase
     const handleSendOtp = async () => {
         const trimmedPhone = phone.trim();
-        // Basic validation - must start with + for international format
         if (!trimmedPhone.startsWith('+') || trimmedPhone.length < 10) {
             showMessage('Enter number with country code. Example: +91 9876543210', true);
             return;
@@ -62,7 +59,6 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
         }
     };
 
-    // Step 2: Verify OTP with Firebase
     const handleVerifyOtp = async () => {
         if (otp.length !== 6) {
             showMessage('Please enter the 6-digit OTP', true);
@@ -74,10 +70,8 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
         }
         setLoading(true);
         try {
-            // Confirm OTP with Firebase
             await confirmation.confirm(otp);
 
-            // OTP verified! Now save the phone number to our backend for security records.
             const trimmedPhone = phone.trim();
             if (token) {
                 try {
@@ -90,7 +84,6 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
                         body: JSON.stringify({ phone: trimmedPhone }),
                     });
                 } catch (saveErr) {
-                    // Non-critical: log but don't block the user
                     console.warn('Could not save phone to backend:', saveErr);
                 }
             }
@@ -108,7 +101,6 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
         }
     };
 
-    // Resend OTP
     const handleResend = async () => {
         setOtp('');
         setConfirmation(null);
@@ -135,88 +127,97 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
 
     return (
         <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-            <View style={styles.overlay}>
-                <View style={[styles.modal, { backgroundColor: colors.surface }]}>
-                    <Text style={[styles.title, { color: colors.text }]}>
-                        {step === 'phone' ? '📱 Phone Verification' : '🔑 Enter OTP'}
-                    </Text>
-                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                        {step === 'phone'
-                            ? 'For security, we need to verify your phone number before you can claim an item. Your number will be saved securely.'
-                            : `Enter the 6-digit code sent to ${phone}`}
-                    </Text>
+            {/* KeyboardAvoidingView MUST be inside Modal to work properly */}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardView}
+            >
+                <View style={styles.overlay}>
+                    <View style={[styles.modal, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.title, { color: colors.text }]}>
+                            {step === 'phone' ? '📱 Phone Verification' : '🔑 Enter OTP'}
+                        </Text>
+                        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                            {step === 'phone'
+                                ? 'For security, we need to verify your phone number before you can claim an item. Your number will be saved securely.'
+                                : `Enter the 6-digit code sent to ${phone}`}
+                        </Text>
 
-                    {message ? (
-                        <View style={[
-                            styles.messageBanner,
-                            { backgroundColor: isError ? '#FEE2E2' : '#D1FAE5' }
-                        ]}>
-                            <Text style={{ color: isError ? '#DC2626' : '#065F46', textAlign: 'center', fontSize: 14 }}>
-                                {message}
-                            </Text>
-                        </View>
-                    ) : null}
-
-                    {step === 'phone' ? (
-                        <View>
-                            <Input
-                                label="Phone Number"
-                                placeholder="+91 9876543210"
-                                keyboardType="phone-pad"
-                                value={phone}
-                                onChangeText={setPhone}
-                            />
-                            <Text style={[styles.hint, { color: colors.textSecondary }]}>
-                                ℹ️ Include your country code (e.g. +91 for India)
-                            </Text>
-                        </View>
-                    ) : (
-                        <View>
-                            <Input
-                                label="OTP Code"
-                                placeholder="Enter 6-digit code"
-                                keyboardType="number-pad"
-                                value={otp}
-                                onChangeText={setOtp}
-                                maxLength={6}
-                            />
-                            <View style={styles.resendContainer}>
-                                {timer > 0 ? (
-                                    <Text style={[styles.timerText, { color: colors.textSecondary }]}>
-                                        Resend code in {formatTime(timer)}
-                                    </Text>
-                                ) : (
-                                    <TouchableOpacity onPress={handleResend} disabled={loading}>
-                                        <Text style={[styles.resendText, { color: colors.primary }]}>
-                                            Resend OTP
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
+                        {message ? (
+                            <View style={[
+                                styles.messageBanner,
+                                { backgroundColor: isError ? '#FEE2E2' : '#D1FAE5' }
+                            ]}>
+                                <Text style={{ color: isError ? '#DC2626' : '#065F46', textAlign: 'center', fontSize: 14 }}>
+                                    {message}
+                                </Text>
                             </View>
-                        </View>
-                    )}
+                        ) : null}
 
-                    <View style={styles.actions}>
-                        <Button
-                            title="Cancel"
-                            variant="secondary"
-                            onPress={handleClose}
-                            style={{ flex: 1 }}
-                        />
-                        <Button
-                            title={step === 'phone' ? 'Send OTP' : 'Verify'}
-                            onPress={step === 'phone' ? handleSendOtp : handleVerifyOtp}
-                            loading={loading}
-                            style={{ flex: 1 }}
-                        />
+                        {step === 'phone' ? (
+                            <View>
+                                <Input
+                                    label="Phone Number"
+                                    placeholder="+91 9876543210"
+                                    keyboardType="phone-pad"
+                                    value={phone}
+                                    onChangeText={setPhone}
+                                />
+                                <Text style={[styles.hint, { color: colors.textSecondary }]}>
+                                    ℹ️ Include your country code (e.g. +91 for India)
+                                </Text>
+                            </View>
+                        ) : (
+                            <View>
+                                <Input
+                                    label="OTP Code"
+                                    placeholder="Enter 6-digit code"
+                                    keyboardType="number-pad"
+                                    value={otp}
+                                    onChangeText={setOtp}
+                                    maxLength={6}
+                                />
+                                <View style={styles.resendContainer}>
+                                    {timer > 0 ? (
+                                        <Text style={[styles.timerText, { color: colors.textSecondary }]}>
+                                            Resend code in {formatTime(timer)}
+                                        </Text>
+                                    ) : (
+                                        <TouchableOpacity onPress={handleResend} disabled={loading}>
+                                            <Text style={[styles.resendText, { color: colors.primary }]}>
+                                                Resend OTP
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+                        )}
+
+                        <View style={styles.actions}>
+                            <Button
+                                title="Cancel"
+                                variant="secondary"
+                                onPress={handleClose}
+                                style={{ flex: 1 }}
+                            />
+                            <Button
+                                title={step === 'phone' ? 'Send OTP' : 'Verify'}
+                                onPress={step === 'phone' ? handleSendOtp : handleVerifyOtp}
+                                loading={loading}
+                                style={{ flex: 1 }}
+                            />
+                        </View>
                     </View>
                 </View>
-            </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
+    keyboardView: {
+        flex: 1,
+    },
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
