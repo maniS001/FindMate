@@ -126,10 +126,10 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
     };
 
     return (
-        <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+        <Modal visible={visible} animationType="fade" transparent onRequestClose={handleClose} statusBarTranslucent>
             {/* KeyboardAvoidingView MUST be inside Modal to work properly */}
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
                 style={styles.keyboardView}
             >
                 <View style={styles.overlay}>
