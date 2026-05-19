@@ -1,6 +1,6 @@
 import { Link } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CaptchaWidget, { CaptchaRef } from '../../components/CaptchaWidget';
@@ -8,10 +8,12 @@ import Input from '../../components/Input';
 import { API_URL } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
 
 export default function Signup() {
     const { colors } = useTheme();
     const { signup } = useAuth();
+    const isKeyboardVisible = useKeyboardVisible();
 
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -77,12 +79,15 @@ export default function Signup() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <View style={styles.header}>
-                        <Text style={[styles.title, { color: colors.primary }]}>Create Account</Text>
-                        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                            Join FindMate today
-                        </Text>
-                    </View>
+                    {/* Hide header when keyboard is open to prevent clipping */}
+                    {!isKeyboardVisible && (
+                        <View style={styles.header}>
+                            <Text style={[styles.title, { color: colors.primary }]}>Create Account</Text>
+                            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                                Join FindMate today
+                            </Text>
+                        </View>
+                    )}
 
                     <View style={styles.form}>
                         <Input

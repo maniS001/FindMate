@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import { GoogleSignInBtn } from '../../components/GoogleSignInButton';
@@ -9,27 +9,29 @@ import Input from '../../components/Input';
 import { API_URL } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
 
 export default function Login() {
     const { colors } = useTheme();
     const { login } = useAuth();
     const router = useRouter();
+    const isKeyboardVisible = useKeyboardVisible();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     const handleLogin = async () => {
+        setError('');
         if (!email || !password) {
-            Alert.alert('Error', 'Please fill in all fields');
+            setError('Please fill in all fields.');
             return;
         }
 
         setLoading(true);
         try {
-            // Get push token from storage
             const pushToken = await AsyncStorage.getItem('expoPushToken');
-
             const response = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -40,8 +42,8 @@ export default function Login() {
             if (!response.ok) throw new Error(data.error || 'Login failed');
 
             await login(data.token, data.user);
-        } catch (error: any) {
-            Alert.alert('Error', error.message);
+        } catch (e: any) {
+            setError(e.message || 'Login failed. Please check your credentials.');
         } finally {
             setLoading(false);
         }
@@ -50,16 +52,10 @@ export default function Login() {
     const handleGoogleLogin = async (userInfo: any) => {
         setLoading(true);
         try {
-            // Get the idToken, location, and coordinates from the Google Sign-In response
             const { idToken, location, latitude, longitude } = userInfo.data;
+            if (!idToken) throw new Error('No ID token found');
 
-            if (!idToken) {
-                throw new Error('No ID token found');
-            }
-
-            // Get push token from storage
             const pushToken = await AsyncStorage.getItem('expoPushToken');
-
             const response = await fetch(`${API_URL}/auth/google`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -68,15 +64,12 @@ export default function Login() {
 
             const data = await response.json();
             if (!response.ok) {
-                const errorMessage = data.details
-                    ? `${data.error}: ${data.details}`
-                    : (data.error || 'Google login failed');
-                throw new Error(errorMessage);
+                throw new Error(data.details ? `${data.error}: ${data.details}` : (data.error || 'Google login failed'));
             }
 
             await login(data.token, data.user);
-        } catch (error: any) {
-            Alert.alert('Error', error.message);
+        } catch (e: any) {
+            setError(e.message || 'Google Sign-In failed.');
         } finally {
             setLoading(false);
         }
@@ -84,18 +77,38 @@ export default function Login() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <View style={styles.content}>
-                    <View style={styles.header}>
-                        <Text style={[styles.title, { color: colors.primary }]}>FindMate</Text>
-                        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Welcome back!</Text>
-                    </View>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    {/* Hide header when keyboard is open to prevent clipping */}
+                    {!isKeyboardVisible && (
+                        <View style={styles.header}>
+                            <Text style={[styles.title, { color: colors.primary }]}>FindMate</Text>
+                            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                                Welcome back!
+                            </Text>
+                        </View>
+                    )}
 
-                    <View style={styles.form}>
+                    <View style={[styles.form, !isKeyboardVisible && { marginTop: 0 }]}>
+                        {/* Inline error banner */}
+                        {!!error && (
+                            <View style={[styles.errorBox, { backgroundColor: '#ff4d4f20', borderColor: '#ff4d4f' }]}>
+                                <Text style={styles.errorText}>{error}</Text>
+                            </View>
+                        )}
+
                         <Input
                             label="Email"
                             value={email}
-                            onChangeText={setEmail}
+                            onChangeText={(v) => { setEmail(v); setError(''); }}
                             placeholder="Enter your email"
                             keyboardType="email-address"
                             autoCapitalize="none"
@@ -103,7 +116,7 @@ export default function Login() {
                         <Input
                             label="Password"
                             value={password}
-                            onChangeText={setPassword}
+                            onChangeText={(v) => { setPassword(v); setError(''); }}
                             placeholder="Enter your password"
                             secureTextEntry
                         />
@@ -123,7 +136,7 @@ export default function Login() {
 
                         <GoogleSignInBtn
                             onSignInSuccess={handleGoogleLogin}
-                            onSignInFailure={(error) => Alert.alert('Error', error.message || 'Google Sign-In failed')}
+                            onSignInFailure={(e) => setError(e.message || 'Google Sign-In failed')}
                         />
 
                         <View style={styles.footer}>
@@ -131,36 +144,31 @@ export default function Login() {
                                 Don't have an account?
                             </Text>
                             <Link href="/auth/signup" asChild>
-                                <Text style={StyleSheet.flatten([styles.link, { color: colors.primary }])}>Sign Up</Text>
+                                <Text style={StyleSheet.flatten([styles.link, { color: colors.primary }])}>
+                                    Sign Up
+                                </Text>
                             </Link>
                         </View>
                     </View>
-                </View>
-            </ScrollView>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
+    container: { flex: 1 },
     scrollContent: {
         flexGrow: 1,
         justifyContent: 'center',
-    },
-    content: {
         padding: 24,
-        width: '100%',
-        maxWidth: 480, // Limit width for large screens
-        alignSelf: 'center',
     },
     header: {
         alignItems: 'center',
-        marginBottom: 48,
+        marginBottom: 40,
     },
     title: {
-        fontSize: 32,
+        fontSize: 36,
         fontWeight: 'bold',
         marginBottom: 8,
     },
@@ -169,37 +177,34 @@ const styles = StyleSheet.create({
     },
     form: {
         gap: 16,
+        width: '100%',
+        maxWidth: 480,
+        alignSelf: 'center',
     },
-    button: {
-        marginTop: 8,
+    errorBox: {
+        borderWidth: 1,
+        borderRadius: 10,
+        padding: 12,
     },
+    errorText: {
+        color: '#ff4d4f',
+        fontSize: 13,
+        textAlign: 'center',
+    },
+    button: { marginTop: 8 },
     divider: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 8, // Reduced from 16
+        marginVertical: 8,
     },
-    line: {
-        flex: 1,
-        height: 1,
-    },
-    orText: {
-        marginHorizontal: 16,
-        fontSize: 14,
-    },
-    googleButton: {
-        marginTop: 0,
-    },
+    line: { flex: 1, height: 1 },
+    orText: { marginHorizontal: 16, fontSize: 14 },
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',
         gap: 8,
         marginTop: 16,
     },
-    footerText: {
-        fontSize: 14,
-    },
-    link: {
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
+    footerText: { fontSize: 14 },
+    link: { fontSize: 14, fontWeight: 'bold' },
 });
