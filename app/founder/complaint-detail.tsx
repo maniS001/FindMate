@@ -7,6 +7,7 @@ import Button from '../../components/Button';
 import Card from '../../components/Card';
 import NotifyOwnerModal from '../../components/NotifyOwnerModal';
 import { API_URL } from '../../constants/api';
+import { CONFIG } from '../../constants/config';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Complaint, getComplaintById, Item, notifyOwner, updateComplaintStatus } from '../../store';
@@ -192,7 +193,10 @@ export default function ComplaintDetail() {
                             <View style={styles.infoContent}>
                                 <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Contact</Text>
                                 <Text style={[styles.infoValue, { color: colors.text }]}>
-                                    {isResolved ? complaint.contactInfo : 'Start Notify to Connect'}
+                                    {/* Show phone directly when payment is disabled OR when resolved */}
+                                    {isResolved || !CONFIG.ENABLE_PAYMENT
+                                        ? complaint.contactInfo
+                                        : 'Start Notify to Connect'}
                                 </Text>
                             </View>
                         </View>
@@ -208,14 +212,17 @@ export default function ComplaintDetail() {
                     )}
                 </Card>
 
-                <View style={styles.actions}>
-                    <Button
-                        title="Notify Owner"
-                        onPress={() => setNotifyModalVisible(true)}
-                        style={{ flex: 1 }}
-                        variant="primary"
-                    />
-                </View>
+                {/* Only show Notify Owner button when payment is enabled */}
+                {CONFIG.ENABLE_PAYMENT && !isResolved && (
+                    <View style={styles.actions}>
+                        <Button
+                            title="Notify Owner"
+                            onPress={() => setNotifyModalVisible(true)}
+                            style={{ flex: 1 }}
+                            variant="primary"
+                        />
+                    </View>
+                )}
             </ScrollView>
 
             <NotifyOwnerModal

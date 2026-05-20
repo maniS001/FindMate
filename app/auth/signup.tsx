@@ -3,9 +3,7 @@ import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
-import CaptchaWidget, { CaptchaRef } from '../../components/CaptchaWidget';
 import Input from '../../components/Input';
-import { API_URL } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
@@ -21,8 +19,6 @@ export default function Signup() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const captchaRef = useRef<CaptchaRef>(null);
-
     const handleSignup = async () => {
         setError('');
 
@@ -34,34 +30,12 @@ export default function Signup() {
             setError('Password must be at least 6 characters.');
             return;
         }
-        if (!captchaRef.current?.isFilled()) {
-            setError('Please solve the CAPTCHA before signing up.');
-            return;
-        }
 
         setLoading(true);
         try {
-            // --- Step 1: Verify CAPTCHA ---
-            const { captchaId, answer } = captchaRef.current.getValues();
-            const captchaRes = await fetch(`${API_URL}/captcha/verify`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ captchaId, answer }),
-            });
-            const captchaData = await captchaRes.json();
-
-            if (!captchaData.valid) {
-                setError(captchaData.error || 'Incorrect CAPTCHA answer. Please try again.');
-                captchaRef.current.refresh(); // Load a fresh captcha
-                return;
-            }
-
-            // --- Step 2: Create Account ---
             await signup(name, email, password);
-
         } catch (e: any) {
             setError(e.message || 'Signup failed. Please try again.');
-            captchaRef.current?.refresh();
         } finally {
             setLoading(false);
         }
@@ -79,7 +53,7 @@ export default function Signup() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Hide header when keyboard is open to prevent clipping */}
+                    {/* Hide header when keyboard is open */}
                     {!isKeyboardVisible && (
                         <View style={styles.header}>
                             <Text style={[styles.title, { color: colors.primary }]}>Create Account</Text>
@@ -93,14 +67,14 @@ export default function Signup() {
                         <Input
                             label="Full Name"
                             value={name}
-                            onChangeText={setName}
+                            onChangeText={(v) => { setName(v); setError(''); }}
                             placeholder="Enter your name"
                             autoCapitalize="words"
                         />
                         <Input
                             label="Email"
                             value={email}
-                            onChangeText={setEmail}
+                            onChangeText={(v) => { setEmail(v); setError(''); }}
                             placeholder="Enter your email"
                             keyboardType="email-address"
                             autoCapitalize="none"
@@ -108,15 +82,12 @@ export default function Signup() {
                         <Input
                             label="Password"
                             value={password}
-                            onChangeText={setPassword}
+                            onChangeText={(v) => { setPassword(v); setError(''); }}
                             placeholder="Create a password (min. 6 chars)"
                             secureTextEntry
                         />
 
-                        {/* ─── CAPTCHA ─── */}
-                        <CaptchaWidget ref={captchaRef} />
-
-                        {/* ─── Error message ─── */}
+                        {/* Inline error message */}
                         {!!error && (
                             <View style={[styles.errorBox, { backgroundColor: '#ff4d4f20', borderColor: '#ff4d4f' }]}>
                                 <Text style={styles.errorText}>{error}</Text>
@@ -179,9 +150,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
         textAlign: 'center',
     },
-    button: {
-        marginTop: 8,
-    },
+    button: { marginTop: 8 },
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',

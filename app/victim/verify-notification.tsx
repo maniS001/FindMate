@@ -1,13 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle } from 'lucide-react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
-import Captcha from '../../components/Captcha';
+import CaptchaWidget, { CaptchaRef } from '../../components/CaptchaWidget';
 import Input from '../../components/Input';
 import OtpModal from '../../components/OtpModal';
 import PaymentModal from '../../components/PaymentModal';
+import { API_URL } from '../../constants/api';
 import { CONFIG } from '../../constants/config';
 import { useTheme } from '../../contexts/ThemeContext';
 import { updateComplaintStatus } from '../../store';
@@ -19,11 +20,15 @@ export default function VerifyNotificationScreen() {
     const { colors } = useTheme();
 
     // State for Verification Flow
-    const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+    const [captchaVerified, setCaptchaVerified] = useState(false);
+    const [captchaLoading, setCaptchaLoading] = useState(false);
+    const [captchaError, setCaptchaError] = useState('');
     const [showOtpModal, setShowOtpModal] = useState(false);
     const [isOtpVerified, setIsOtpVerified] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [isPaid, setIsPaid] = useState(false);
+
+    const captchaRef = useRef<CaptchaRef>(null);
 
     // State for Security Questions
     const [loading, setLoading] = useState(false);
@@ -39,11 +44,39 @@ export default function VerifyNotificationScreen() {
 
     const { questions = [], founderPhone, complaintId, description } = data;
 
-    // --- Step 1: Captcha ---
-    const handleCaptchaVerify = (isValid: boolean) => {
-        setIsCaptchaVerified(isValid);
-        if (isValid && !isOtpVerified) {
-            setTimeout(() => setShowOtpModal(true), 500);
+    // --- Step 1: Verify CAPTCHA against backend ---
+    const handleCaptchaSubmit = async () => {
+        if (!captchaRef.current?.isFilled()) {
+            setCaptchaError('Please enter the CAPTCHA answer.');
+            return;
+        }
+        setCaptchaLoading(true);
+        setCaptchaError('');
+        try {
+            const { captchaId, answer } = captchaRef.current.getValues();
+            const res = await fetch(`${API_URL}/captcha/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ captchaId, answer }),
+            });
+            const data = await res.json();
+            if (data.valid) {
+                setCaptchaVerified(true);
+                // Proceed to OTP
+                if (CONFIG.SMS_OTP_ENABLED) {
+                    setTimeout(() => setShowOtpModal(true), 300);
+                } else {
+                    // Skip OTP — go straight to payment or questions
+                    handleOtpVerified();
+                }
+            } else {
+                setCaptchaError(data.error || 'Incorrect answer. Please try again.');
+                captchaRef.current?.refresh();
+            }
+        } catch (e) {
+            setCaptchaError('Network error. Please try again.');
+        } finally {
+            setCaptchaLoading(false);
         }
     };
 
@@ -115,7 +148,7 @@ export default function VerifyNotificationScreen() {
                         </View>
 
                         <Text style={[styles.note, { color: colors.textSecondary }]}>
-                            Please contact the founder to arrange the return.
+                            Please contact the founder to arrange the return.{"\n"}
                             Your complaint has been marked as resolved.
                         </Text>
 
@@ -155,7 +188,7 @@ export default function VerifyNotificationScreen() {
                 >
                     <Text style={[styles.title, { color: colors.text }]}>Security Check</Text>
 
-                    {!isOtpVerified || !isPaid ? (
+                    {!captchaVerified || (CONFIG.SMS_OTP_ENABLED && !isOtpVerified) || (CONFIG.ENABLE_PAYMENT && !isPaid) ? (
                         <View style={styles.section}>
                             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                                 Complete the steps below to verify your identity before answering the founder's questions.
@@ -168,7 +201,21 @@ export default function VerifyNotificationScreen() {
                                 </Text>
                             </View>
 
-                            <Captcha onVerify={handleCaptchaVerify} />
+                            {/* ── Backend-verified CAPTCHA ── */}
+                            {!captchaVerified && (
+                                <View>
+                                    <CaptchaWidget ref={captchaRef} />
+                                    {!!captchaError && (
+                                        <Text style={styles.captchaError}>{captchaError}</Text>
+                                    )}
+                                    <Button
+                                        title="Verify CAPTCHA"
+                                        onPress={handleCaptchaSubmit}
+                                        loading={captchaLoading}
+                                        style={{ marginTop: 8 }}
+                                    />
+                                </View>
+                            )}
                         </View>
                     ) : (
                         <View style={styles.section}>
@@ -219,6 +266,13 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: 24,
+    },
+    captchaError: {
+        color: '#ff4d4f',
+        fontSize: 13,
+        marginTop: 6,
+        marginBottom: 4,
+        textAlign: 'center',
     },
     center: {
         flex: 1,
