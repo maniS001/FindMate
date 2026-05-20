@@ -2,22 +2,22 @@ import { RefreshCw } from 'lucide-react-native';
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import {
     ActivityIndicator,
-    Image,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SvgXml } from 'react-native-svg';
 import { API_URL } from '../constants/api';
 import { useTheme } from '../contexts/ThemeContext';
 
 export interface CaptchaRef {
     /** Returns captchaId + typed answer. Call before submitting form. */
     getValues: () => { captchaId: string; answer: string };
-    /** Returns true if the captcha has been solved (answer typed). */
+    /** Returns true if the user has typed an answer. */
     isFilled: () => boolean;
-    /** Force reload a fresh captcha (e.g. after a failed attempt). */
+    /** Load a fresh captcha (e.g. after a failed attempt). */
     refresh: () => void;
 }
 
@@ -27,7 +27,7 @@ interface Props {
 
 const CaptchaWidget = forwardRef<CaptchaRef, Props>(({ onValidated }, ref) => {
     const { colors } = useTheme();
-    const [svgBase64, setSvgBase64] = useState<string | null>(null);
+    const [svgXml, setSvgXml] = useState<string | null>(null);
     const [captchaId, setCaptchaId] = useState<string>('');
     const [answer, setAnswer] = useState('');
     const [loading, setLoading] = useState(false);
@@ -41,7 +41,7 @@ const CaptchaWidget = forwardRef<CaptchaRef, Props>(({ onValidated }, ref) => {
             const res = await fetch(`${API_URL}/captcha/generate`);
             const data = await res.json();
             setCaptchaId(data.captchaId);
-            setSvgBase64(data.svgBase64);
+            setSvgXml(data.svgXml); // raw SVG string from backend
         } catch (e) {
             setError('Failed to load CAPTCHA. Check connection.');
         } finally {
@@ -62,30 +62,30 @@ const CaptchaWidget = forwardRef<CaptchaRef, Props>(({ onValidated }, ref) => {
     return (
         <View style={styles.wrapper}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Verify you're human
+                Verify you're human — solve the math question
             </Text>
 
-            <View style={[styles.captchaRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                {/* CAPTCHA Image */}
-                <View style={styles.imageBox}>
-                    {loading ? (
-                        <ActivityIndicator color={colors.primary} />
-                    ) : svgBase64 ? (
-                        <Image
-                            source={{ uri: `data:image/svg+xml;base64,${svgBase64}` }}
-                            style={styles.captchaImage}
-                            resizeMode="contain"
-                        />
-                    ) : (
-                        <Text style={{ color: colors.textSecondary, fontSize: 12 }}>–</Text>
-                    )}
-                </View>
+            {/* CAPTCHA Image Box */}
+            <View style={[styles.captchaBox, { backgroundColor: '#1a1a2e', borderColor: colors.border }]}>
+                {loading ? (
+                    <ActivityIndicator color={colors.primary} />
+                ) : svgXml ? (
+                    <SvgXml
+                        xml={svgXml}
+                        width="100%"
+                        height="60"
+                    />
+                ) : (
+                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                        {error || 'Loading...'}
+                    </Text>
+                )}
 
                 {/* Refresh Button */}
                 <TouchableOpacity
                     onPress={fetchCaptcha}
                     style={[styles.refreshBtn, { borderColor: colors.border }]}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                     <RefreshCw size={18} color={colors.primary} />
                 </TouchableOpacity>
@@ -98,7 +98,7 @@ const CaptchaWidget = forwardRef<CaptchaRef, Props>(({ onValidated }, ref) => {
                     backgroundColor: colors.surface,
                     borderColor: error ? '#ff4d4f' : colors.border,
                 }]}
-                placeholder="Enter the answer above"
+                placeholder="Type your answer here"
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="numeric"
                 value={answer}
@@ -118,49 +118,41 @@ export default CaptchaWidget;
 
 const styles = StyleSheet.create({
     wrapper: {
-        gap: 8,
+        gap: 10,
     },
     label: {
         fontSize: 13,
         fontWeight: '500',
         marginBottom: 2,
     },
-    captchaRow: {
+    captchaBox: {
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
         borderRadius: 12,
         overflow: 'hidden',
-        height: 64,
-    },
-    imageBox: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 8,
-    },
-    captchaImage: {
-        width: '100%',
-        height: 54,
+        height: 68,
+        paddingHorizontal: 12,
     },
     refreshBtn: {
-        width: 48,
-        height: '100%',
-        alignItems: 'center',
-        justifyContent: 'center',
+        marginLeft: 'auto',
+        paddingLeft: 12,
+        paddingVertical: 8,
         borderLeftWidth: 1,
     },
     input: {
-        height: 48,
+        height: 50,
         borderWidth: 1,
         borderRadius: 12,
         paddingHorizontal: 16,
-        fontSize: 16,
-        letterSpacing: 4,
+        fontSize: 20,
+        letterSpacing: 8,
+        textAlign: 'center',
     },
     errorText: {
         color: '#ff4d4f',
         fontSize: 12,
         marginTop: 2,
+        textAlign: 'center',
     },
 });

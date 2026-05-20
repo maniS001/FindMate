@@ -98,9 +98,8 @@ app.get('/api/captcha/generate', (req, res) => {
     const captchaId = uuidv4();
     // Store the answer, expire in 5 minutes
     captchaStore.set(captchaId, { text: captcha.text, expiresAt: Date.now() + 5 * 60 * 1000 });
-    // Return the SVG as a data URI so mobile can render it as an <Image>
-    const svgBase64 = Buffer.from(captcha.data).toString('base64');
-    res.json({ captchaId, svgBase64 });
+    // Return the raw SVG string — frontend uses SvgXml to render it (React Native doesn't support SVG data URIs)
+    res.json({ captchaId, svgXml: captcha.data });
 });
 
 // Verify CAPTCHA
