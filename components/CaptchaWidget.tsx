@@ -8,12 +8,11 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { SvgXml } from 'react-native-svg';
 import { API_URL } from '../constants/api';
 import { useTheme } from '../contexts/ThemeContext';
 
 export interface CaptchaRef {
-    /** Returns captchaId + typed answer. Call before submitting form. */
+    /** Returns captchaId + typed answer. Call before submitting the form. */
     getValues: () => { captchaId: string; answer: string };
     /** Returns true if the user has typed an answer. */
     isFilled: () => boolean;
@@ -21,29 +20,25 @@ export interface CaptchaRef {
     refresh: () => void;
 }
 
-interface Props {
-    onValidated?: (valid: boolean) => void;
-}
-
-const CaptchaWidget = forwardRef<CaptchaRef, Props>(({ onValidated }, ref) => {
+const CaptchaWidget = forwardRef<CaptchaRef>((_, ref) => {
     const { colors } = useTheme();
-    const [svgXml, setSvgXml] = useState<string | null>(null);
+    const [question, setQuestion] = useState<string | null>(null);
     const [captchaId, setCaptchaId] = useState<string>('');
     const [answer, setAnswer] = useState('');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [fetchError, setFetchError] = useState('');
 
     const fetchCaptcha = useCallback(async () => {
         setLoading(true);
-        setError('');
+        setFetchError('');
         setAnswer('');
         try {
             const res = await fetch(`${API_URL}/captcha/generate`);
             const data = await res.json();
             setCaptchaId(data.captchaId);
-            setSvgXml(data.svgXml); // raw SVG string from backend
-        } catch (e) {
-            setError('Failed to load CAPTCHA. Check connection.');
+            setQuestion(data.question); // e.g. "4 + 7 = ?"
+        } catch {
+            setFetchError('Failed to load. Tap refresh.');
         } finally {
             setLoading(false);
         }
@@ -62,32 +57,29 @@ const CaptchaWidget = forwardRef<CaptchaRef, Props>(({ onValidated }, ref) => {
     return (
         <View style={styles.wrapper}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Verify you're human — solve the math question
+                Solve the math to verify you're human
             </Text>
 
-            {/* CAPTCHA Image Box */}
-            <View style={[styles.captchaBox, { backgroundColor: '#1a1a2e', borderColor: colors.border }]}>
-                {loading ? (
-                    <ActivityIndicator color={colors.primary} />
-                ) : svgXml ? (
-                    <SvgXml
-                        xml={svgXml}
-                        width="100%"
-                        height="60"
-                    />
-                ) : (
-                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                        {error || 'Loading...'}
-                    </Text>
-                )}
+            {/* Question Display Box */}
+            <View style={[styles.questionBox, { backgroundColor: '#1a1a2e', borderColor: colors.primary }]}>
+                <View style={styles.questionInner}>
+                    {loading ? (
+                        <ActivityIndicator color={colors.primary} size="small" />
+                    ) : fetchError ? (
+                        <Text style={styles.errorLabel}>{fetchError}</Text>
+                    ) : (
+                        <Text style={styles.questionText}>{question}</Text>
+                    )}
+                </View>
 
                 {/* Refresh Button */}
                 <TouchableOpacity
                     onPress={fetchCaptcha}
-                    style={[styles.refreshBtn, { borderColor: colors.border }]}
+                    style={[styles.refreshBtn, { borderColor: colors.primary + '55' }]}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    disabled={loading}
                 >
-                    <RefreshCw size={18} color={colors.primary} />
+                    <RefreshCw size={18} color={loading ? colors.textSecondary : colors.primary} />
                 </TouchableOpacity>
             </View>
 
@@ -96,19 +88,16 @@ const CaptchaWidget = forwardRef<CaptchaRef, Props>(({ onValidated }, ref) => {
                 style={[styles.input, {
                     color: colors.text,
                     backgroundColor: colors.surface,
-                    borderColor: error ? '#ff4d4f' : colors.border,
+                    borderColor: colors.border,
                 }]}
-                placeholder="Type your answer here"
+                placeholder="Type the answer"
                 placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
+                keyboardType="number-pad"
                 value={answer}
-                onChangeText={(v) => { setAnswer(v); setError(''); }}
-                maxLength={4}
+                onChangeText={setAnswer}
+                maxLength={3}
+                textAlign="center"
             />
-
-            {!!error && (
-                <Text style={styles.errorText}>{error}</Text>
-            )}
         </View>
     );
 });
@@ -123,36 +112,46 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 13,
         fontWeight: '500',
-        marginBottom: 2,
     },
-    captchaBox: {
+    questionBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderRadius: 12,
+        borderWidth: 1.5,
+        borderRadius: 14,
         overflow: 'hidden',
-        height: 68,
+        height: 72,
+    },
+    questionInner: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
         paddingHorizontal: 12,
     },
+    questionText: {
+        fontSize: 32,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        letterSpacing: 4,
+        fontFamily: 'monospace',
+    },
+    errorLabel: {
+        color: '#ff4d4f',
+        fontSize: 13,
+    },
     refreshBtn: {
-        marginLeft: 'auto',
-        paddingLeft: 12,
-        paddingVertical: 8,
+        width: 54,
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
         borderLeftWidth: 1,
     },
     input: {
-        height: 50,
+        height: 52,
         borderWidth: 1,
         borderRadius: 12,
         paddingHorizontal: 16,
-        fontSize: 20,
-        letterSpacing: 8,
-        textAlign: 'center',
-    },
-    errorText: {
-        color: '#ff4d4f',
-        fontSize: 12,
-        marginTop: 2,
-        textAlign: 'center',
+        fontSize: 24,
+        fontWeight: '700',
+        letterSpacing: 6,
     },
 });

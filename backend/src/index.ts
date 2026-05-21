@@ -87,19 +87,17 @@ setInterval(() => {
 
 // Generate CAPTCHA
 app.get('/api/captcha/generate', (req, res) => {
-    const captcha = svgCaptcha.createMathExpr({
-        noise: 1,
-        mathMin: 1,
-        mathMax: 9,
-        mathOperator: '+',
-        color: true,
-        background: '#1a1a2e',
-    });
+    // Generate two random numbers for a math problem
+    const a = Math.floor(Math.random() * 9) + 1;
+    const b = Math.floor(Math.random() * 9) + 1;
+    const answer = String(a + b);
+    const question = `${a} + ${b} = ?`;
+
     const captchaId = uuidv4();
-    // Store the answer, expire in 5 minutes
-    captchaStore.set(captchaId, { text: captcha.text, expiresAt: Date.now() + 5 * 60 * 1000 });
-    // Return the raw SVG string — frontend uses SvgXml to render it (React Native doesn't support SVG data URIs)
-    res.json({ captchaId, svgXml: captcha.data });
+    // Store the answer server-side, expire in 5 minutes
+    captchaStore.set(captchaId, { text: answer, expiresAt: Date.now() + 5 * 60 * 1000 });
+    // Return the question as plain text — frontend renders it (no SVG/image, avoids Fabric incompatibility)
+    res.json({ captchaId, question });
 });
 
 // Verify CAPTCHA
