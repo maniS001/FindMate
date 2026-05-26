@@ -125,7 +125,6 @@ export default function ReasonModal({ visible, type, onClose, onSubmit, loading 
                     />
                 </View>
                 </View>
-            </View>
             </KeyboardAvoidingView>
         </Modal>
     );
