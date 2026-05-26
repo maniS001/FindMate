@@ -1,6 +1,6 @@
 import { X } from 'lucide-react-native';
 import { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import Button from './Button';
 import Input from './Input';
@@ -55,8 +55,12 @@ export default function ReasonModal({ visible, type, onClose, onSubmit, loading 
     };
 
     return (
-        <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-            <View style={styles.overlay}>
+        <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose} statusBarTranslucent>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+            >
+                <View style={styles.overlay}>
                 <View style={[styles.modal, { backgroundColor: colors.surface }]}>
                     <View style={styles.header}>
                         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
@@ -120,7 +124,9 @@ export default function ReasonModal({ visible, type, onClose, onSubmit, loading 
                         style={{ marginTop: 16 }}
                     />
                 </View>
+                </View>
             </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

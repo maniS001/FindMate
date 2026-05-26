@@ -1,6 +1,6 @@
 import { Star } from 'lucide-react-native';
 import { useState } from 'react';
-import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import Button from './Button';
 
@@ -28,8 +28,13 @@ export default function FeedbackModal({ visible, onClose, onSubmit, loading }: F
             transparent
             animationType="fade"
             onRequestClose={onClose}
+            statusBarTranslucent
         >
-            <View style={styles.overlay}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+            >
+                <View style={styles.overlay}>
                 <View style={[styles.container, { backgroundColor: colors.surface }]}>
                     <Text style={[styles.title, { color: colors.text }]}>Item Recovered!</Text>
                     <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -86,6 +91,7 @@ export default function FeedbackModal({ visible, onClose, onSubmit, loading }: F
                     </View>
                 </View>
             </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

@@ -1,6 +1,6 @@
 import { Package, Trash2 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Item } from '../store';
 import Button from './Button';
@@ -93,10 +93,15 @@ export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading, 
         <Modal
             visible={visible}
             transparent
-            animationType="slide"
+            animationType="fade"
             onRequestClose={onClose}
+            statusBarTranslucent
         >
-            <View style={styles.overlay}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+            >
+                <View style={styles.overlay}>
                 <View style={[styles.container, { backgroundColor: colors.surface }]}>
                     <Text style={[styles.title, { color: colors.text }]}>Notify Owner</Text>
                     <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -212,6 +217,7 @@ export default function NotifyOwnerModal({ visible, onClose, onSubmit, loading, 
                     </View>
                 </View>
             </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

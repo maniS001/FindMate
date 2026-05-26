@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import React, { useState } from 'react';
-import { ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface LocationInputModalProps {
     visible: boolean;
@@ -100,9 +100,14 @@ export const LocationInputModal: React.FC<LocationInputModalProps> = ({
             transparent
             animationType="fade"
             onRequestClose={handleSkip}
+            statusBarTranslucent
         >
-            <View style={styles.overlay}>
-                <View style={styles.container}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+            >
+                <View style={styles.overlay}>
+                    <View style={styles.container}>
                     <Text style={styles.title}>Location Required</Text>
                     <Text style={styles.subtitle}>
                         We couldn't detect your location automatically.
@@ -161,7 +166,8 @@ export const LocationInputModal: React.FC<LocationInputModalProps> = ({
                         </TouchableOpacity>
                     </View>
                 </View>
-            </View>
+                </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 };
