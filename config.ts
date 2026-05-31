@@ -25,7 +25,7 @@ export const APP_CONFIG = {
          * SMS OTP Verification
          * Set to false to skip OTP verification (use mock/bypass)
          */
-        SMS_OTP_ENABLED: false, // Will enable after service setup
+        SMS_OTP_ENABLED: true, // Firebase Phone Auth enabled
     },
 
     // API Configuration
