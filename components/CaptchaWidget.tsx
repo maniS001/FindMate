@@ -1,84 +1,75 @@
 import { RefreshCw } from 'lucide-react-native';
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useImperativeHandle, useState } from 'react';
 import {
-    ActivityIndicator,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_URL } from '../constants/api';
 import { useTheme } from '../contexts/ThemeContext';
 
 export interface CaptchaRef {
+    /** Returns typed answer and the correct answer for local validation. */
     getValues: () => { captchaId: string; answer: string };
+    /** Returns true if the user has typed an answer. */
     isFilled: () => boolean;
+    /** Validate the entered answer locally. Returns true if correct. */
+    validate: () => boolean;
+    /** Load a fresh captcha (e.g. after a failed attempt). */
     refresh: () => void;
 }
 
-const MAX_RETRIES = 4;
-const RETRY_DELAY_MS = 2000; // wait 2s between retries (backend may be waking up)
+interface MathQuestion {
+    question: string;
+    answer: string;
+}
+
+function generateQuestion(): MathQuestion {
+    const ops = ['+', '-', '*'] as const;
+    const op = ops[Math.floor(Math.random() * ops.length)];
+    let a: number, b: number, answer: number;
+
+    if (op === '+') {
+        a = Math.floor(Math.random() * 9) + 1;
+        b = Math.floor(Math.random() * 9) + 1;
+        answer = a + b;
+    } else if (op === '-') {
+        a = Math.floor(Math.random() * 8) + 2;
+        b = Math.floor(Math.random() * (a - 1)) + 1; // ensure positive result
+        answer = a - b;
+    } else {
+        a = Math.floor(Math.random() * 5) + 2;
+        b = Math.floor(Math.random() * 4) + 2;
+        answer = a * b;
+    }
+
+    const opSymbol = op === '*' ? '×' : op;
+    return { question: `${a} ${opSymbol} ${b} = ?`, answer: String(answer) };
+}
 
 const CaptchaWidget = forwardRef<CaptchaRef>((_, ref) => {
     const { colors } = useTheme();
-    const [question, setQuestion] = useState<string | null>(null);
-    const [captchaId, setCaptchaId] = useState<string>('');
+    const [math, setMath] = useState<MathQuestion>(generateQuestion);
     const [answer, setAnswer] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [fetchError, setFetchError] = useState('');
-    const retryCount = useRef(0);
+    const [shakeError, setShakeError] = useState(false);
 
-    const fetchCaptcha = useCallback(async (isRetry = false) => {
-        if (!isRetry) {
-            retryCount.current = 0;
-            setFetchError('');
-            setAnswer('');
-        }
-        setLoading(true);
-
-        const attempt = async (): Promise<void> => {
-            try {
-                const res = await fetch(`${API_URL}/captcha/generate`, {
-                    headers: { 'Content-Type': 'application/json' },
-                });
-
-                if (!res.ok) throw new Error(`Server error: ${res.status}`);
-
-                const data = await res.json();
-
-                // Validate response has expected fields
-                if (!data.question || !data.captchaId) {
-                    throw new Error('Invalid response from server');
-                }
-
-                setCaptchaId(data.captchaId);
-                setQuestion(data.question); // e.g. "4 + 7 = ?"
-                setFetchError('');
-                setLoading(false);
-            } catch (e: any) {
-                retryCount.current += 1;
-                if (retryCount.current < MAX_RETRIES) {
-                    // Retry after delay (backend may still be waking up)
-                    setTimeout(() => attempt(), RETRY_DELAY_MS);
-                } else {
-                    setFetchError('Tap ↻ to reload');
-                    setLoading(false);
-                }
-            }
-        };
-
-        await attempt();
+    const refresh = useCallback(() => {
+        setMath(generateQuestion());
+        setAnswer('');
+        setShakeError(false);
     }, []);
 
-    useEffect(() => {
-        fetchCaptcha();
-    }, [fetchCaptcha]);
+    const validate = useCallback((): boolean => {
+        return answer.trim() === math.answer;
+    }, [answer, math.answer]);
 
     useImperativeHandle(ref, () => ({
-        getValues: () => ({ captchaId, answer }),
+        // captchaId is unused for local validation but kept for API compatibility
+        getValues: () => ({ captchaId: 'local', answer }),
         isFilled: () => answer.trim().length > 0,
-        refresh: () => fetchCaptcha(false),
+        validate,
+        refresh,
     }));
 
     return (
@@ -90,32 +81,16 @@ const CaptchaWidget = forwardRef<CaptchaRef>((_, ref) => {
             {/* Question Display Box */}
             <View style={[styles.questionBox, { backgroundColor: '#1a1a2e', borderColor: colors.primary }]}>
                 <View style={styles.questionInner}>
-                    {loading ? (
-                        <View style={styles.loadingRow}>
-                            <ActivityIndicator color={colors.primary} size="small" />
-                            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                                {retryCount.current > 0
-                                    ? `Retrying... (${retryCount.current}/${MAX_RETRIES})`
-                                    : 'Loading...'}
-                            </Text>
-                        </View>
-                    ) : fetchError ? (
-                        <Text style={styles.errorLabel}>{fetchError}</Text>
-                    ) : question ? (
-                        <Text style={styles.questionText}>{question}</Text>
-                    ) : (
-                        <ActivityIndicator color={colors.primary} size="small" />
-                    )}
+                    <Text style={styles.questionText}>{math.question}</Text>
                 </View>
 
                 {/* Refresh Button */}
                 <TouchableOpacity
-                    onPress={() => fetchCaptcha(false)}
+                    onPress={refresh}
                     style={[styles.refreshBtn, { borderColor: colors.primary + '55' }]}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    disabled={loading}
                 >
-                    <RefreshCw size={18} color={loading ? colors.textSecondary : colors.primary} />
+                    <RefreshCw size={18} color={colors.primary} />
                 </TouchableOpacity>
             </View>
 
@@ -124,16 +99,15 @@ const CaptchaWidget = forwardRef<CaptchaRef>((_, ref) => {
                 style={[styles.input, {
                     color: colors.text,
                     backgroundColor: colors.surface,
-                    borderColor: colors.border,
+                    borderColor: shakeError ? '#ff4d4f' : colors.border,
                 }]}
                 placeholder="Type the answer"
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="number-pad"
                 value={answer}
-                onChangeText={setAnswer}
+                onChangeText={(t) => { setAnswer(t); setShakeError(false); }}
                 maxLength={3}
                 textAlign="center"
-                editable={!!question && !loading}
             />
         </View>
     );
@@ -164,24 +138,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: 12,
     },
-    loadingRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    loadingText: {
-        fontSize: 12,
-    },
     questionText: {
         fontSize: 32,
         fontWeight: '800',
         color: '#FFFFFF',
         letterSpacing: 4,
         fontFamily: 'monospace',
-    },
-    errorLabel: {
-        color: '#ff4d4f',
-        fontSize: 13,
     },
     refreshBtn: {
         width: 54,

@@ -8,7 +8,6 @@ import CaptchaWidget, { CaptchaRef } from '../../components/CaptchaWidget';
 import Input from '../../components/Input';
 import OtpModal from '../../components/OtpModal';
 import PaymentModal from '../../components/PaymentModal';
-import { API_URL } from '../../constants/api';
 import { CONFIG } from '../../constants/config';
 import { useTheme } from '../../contexts/ThemeContext';
 import { updateComplaintStatus } from '../../store';
@@ -44,40 +43,30 @@ export default function VerifyNotificationScreen() {
 
     const { questions = [], founderPhone, complaintId, description } = data;
 
-    // --- Step 1: Verify CAPTCHA against backend ---
-    const handleCaptchaSubmit = async () => {
+
+    // --- Step 1: Verify CAPTCHA locally (client-side math check) ---
+    const handleCaptchaSubmit = () => {
         if (!captchaRef.current?.isFilled()) {
             setCaptchaError('Please enter the CAPTCHA answer.');
             return;
         }
         setCaptchaLoading(true);
         setCaptchaError('');
-        try {
-            const { captchaId, answer } = captchaRef.current.getValues();
-            const res = await fetch(`${API_URL}/captcha/verify`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ captchaId, answer }),
-            });
-            const data = await res.json();
-            if (data.valid) {
-                setCaptchaVerified(true);
-                // Proceed to OTP
-                if (CONFIG.SMS_OTP_ENABLED) {
-                    setTimeout(() => setShowOtpModal(true), 300);
-                } else {
-                    // Skip OTP — go straight to payment or questions
-                    handleOtpVerified();
-                }
+
+        const isCorrect = captchaRef.current.validate();
+        if (isCorrect) {
+            setCaptchaVerified(true);
+            // Proceed to OTP or questions
+            if (CONFIG.SMS_OTP_ENABLED) {
+                setTimeout(() => setShowOtpModal(true), 300);
             } else {
-                setCaptchaError(data.error || 'Incorrect answer. Please try again.');
-                captchaRef.current?.refresh();
+                handleOtpVerified();
             }
-        } catch (e) {
-            setCaptchaError('Network error. Please try again.');
-        } finally {
-            setCaptchaLoading(false);
+        } else {
+            setCaptchaError('Incorrect answer. Please try again.');
+            captchaRef.current?.refresh();
         }
+        setCaptchaLoading(false);
     };
 
     // --- Step 2: OTP ---
