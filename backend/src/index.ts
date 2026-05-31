@@ -92,7 +92,7 @@ const geminiClient = process.env.GEMINI_API_KEY
 
 const getGeminiModel = () => {
     if (!geminiClient) throw new Error('GEMINI_API_KEY not configured');
-    return geminiClient.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    return geminiClient.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 };
 
 // ============= AI Validation Endpoints =============
