@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react-native';
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     StyleSheet,
@@ -12,13 +12,13 @@ import { API_URL } from '../constants/api';
 import { useTheme } from '../contexts/ThemeContext';
 
 export interface CaptchaRef {
-    /** Returns captchaId + typed answer. Call before submitting the form. */
     getValues: () => { captchaId: string; answer: string };
-    /** Returns true if the user has typed an answer. */
     isFilled: () => boolean;
-    /** Load a fresh captcha (e.g. after a failed attempt). */
     refresh: () => void;
 }
+
+const MAX_RETRIES = 4;
+const RETRY_DELAY_MS = 2000; // wait 2s between retries (backend may be waking up)
 
 const CaptchaWidget = forwardRef<CaptchaRef>((_, ref) => {
     const { colors } = useTheme();
@@ -27,21 +27,48 @@ const CaptchaWidget = forwardRef<CaptchaRef>((_, ref) => {
     const [answer, setAnswer] = useState('');
     const [loading, setLoading] = useState(false);
     const [fetchError, setFetchError] = useState('');
+    const retryCount = useRef(0);
 
-    const fetchCaptcha = useCallback(async () => {
-        setLoading(true);
-        setFetchError('');
-        setAnswer('');
-        try {
-            const res = await fetch(`${API_URL}/captcha/generate`);
-            const data = await res.json();
-            setCaptchaId(data.captchaId);
-            setQuestion(data.question); // e.g. "4 + 7 = ?"
-        } catch {
-            setFetchError('Failed to load. Tap refresh.');
-        } finally {
-            setLoading(false);
+    const fetchCaptcha = useCallback(async (isRetry = false) => {
+        if (!isRetry) {
+            retryCount.current = 0;
+            setFetchError('');
+            setAnswer('');
         }
+        setLoading(true);
+
+        const attempt = async (): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/captcha/generate`, {
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+                const data = await res.json();
+
+                // Validate response has expected fields
+                if (!data.question || !data.captchaId) {
+                    throw new Error('Invalid response from server');
+                }
+
+                setCaptchaId(data.captchaId);
+                setQuestion(data.question); // e.g. "4 + 7 = ?"
+                setFetchError('');
+                setLoading(false);
+            } catch (e: any) {
+                retryCount.current += 1;
+                if (retryCount.current < MAX_RETRIES) {
+                    // Retry after delay (backend may still be waking up)
+                    setTimeout(() => attempt(), RETRY_DELAY_MS);
+                } else {
+                    setFetchError('Tap ↻ to reload');
+                    setLoading(false);
+                }
+            }
+        };
+
+        await attempt();
     }, []);
 
     useEffect(() => {
@@ -51,7 +78,7 @@ const CaptchaWidget = forwardRef<CaptchaRef>((_, ref) => {
     useImperativeHandle(ref, () => ({
         getValues: () => ({ captchaId, answer }),
         isFilled: () => answer.trim().length > 0,
-        refresh: fetchCaptcha,
+        refresh: () => fetchCaptcha(false),
     }));
 
     return (
@@ -64,17 +91,26 @@ const CaptchaWidget = forwardRef<CaptchaRef>((_, ref) => {
             <View style={[styles.questionBox, { backgroundColor: '#1a1a2e', borderColor: colors.primary }]}>
                 <View style={styles.questionInner}>
                     {loading ? (
-                        <ActivityIndicator color={colors.primary} size="small" />
+                        <View style={styles.loadingRow}>
+                            <ActivityIndicator color={colors.primary} size="small" />
+                            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                                {retryCount.current > 0
+                                    ? `Retrying... (${retryCount.current}/${MAX_RETRIES})`
+                                    : 'Loading...'}
+                            </Text>
+                        </View>
                     ) : fetchError ? (
                         <Text style={styles.errorLabel}>{fetchError}</Text>
-                    ) : (
+                    ) : question ? (
                         <Text style={styles.questionText}>{question}</Text>
+                    ) : (
+                        <ActivityIndicator color={colors.primary} size="small" />
                     )}
                 </View>
 
                 {/* Refresh Button */}
                 <TouchableOpacity
-                    onPress={fetchCaptcha}
+                    onPress={() => fetchCaptcha(false)}
                     style={[styles.refreshBtn, { borderColor: colors.primary + '55' }]}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     disabled={loading}
@@ -97,6 +133,7 @@ const CaptchaWidget = forwardRef<CaptchaRef>((_, ref) => {
                 onChangeText={setAnswer}
                 maxLength={3}
                 textAlign="center"
+                editable={!!question && !loading}
             />
         </View>
     );
@@ -126,6 +163,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 12,
+    },
+    loadingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    loadingText: {
+        fontSize: 12,
     },
     questionText: {
         fontSize: 32,
