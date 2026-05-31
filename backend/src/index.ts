@@ -1,4 +1,5 @@
-// Backend v2.1 - Math CAPTCHA, Push Notifications, Payment Gateway
+// Backend v2.2 - Math CAPTCHA, Push Notifications, Payment Gateway, AI Validation
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import cors from 'cors';
@@ -83,6 +84,155 @@ setInterval(() => {
         if (captcha.expiresAt < now) captchaStore.delete(id);
     }
 }, 10 * 60 * 1000);
+
+// ============= Gemini AI Setup =============
+const geminiClient = process.env.GEMINI_API_KEY
+    ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+    : null;
+
+const getGeminiModel = () => {
+    if (!geminiClient) throw new Error('GEMINI_API_KEY not configured');
+    return geminiClient.getGenerativeModel({ model: 'gemini-1.5-flash' });
+};
+
+// ============= AI Validation Endpoints =============
+
+// 1. Validate victim complaint form fields
+app.post('/api/ai/validate-complaint', async (req, res) => {
+    const { type, description, location, date, brand, color } = req.body;
+    try {
+        const model = getGeminiModel();
+        const prompt = `You are a lost item complaint validator for a mobile app.
+Validate the following complaint form fields and return JSON only.
+
+Fields submitted:
+- Item Type: "${type || ''}"
+- Description: "${description || ''}"
+- Location Lost: "${location || ''}"
+- Date Lost: "${date || ''}"
+- Brand: "${brand || ''}"
+- Color: "${color || ''}"
+
+Rules to check:
+1. Item type must be specific (not just "item" or "thing")
+2. Description must have at least some detail (min 10 chars, mentions what the item is)
+3. Location must be a real place (not random letters or symbols)
+4. Date must be a valid past date (not future)
+5. Description should NOT contain phone numbers, emails, or social media contacts
+6. All fields together must make sense as a genuine lost item report
+
+Respond ONLY with this JSON (no markdown, no explanation):
+{
+  "valid": true/false,
+  "issues": ["issue1", "issue2"],
+  "suggestions": ["suggestion1"]
+}`;
+
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim()
+            .replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+        const parsed = JSON.parse(text);
+        res.json(parsed);
+    } catch (err: any) {
+        console.error('AI validate-complaint error:', err.message);
+        // Fail open — don't block submission if AI is unavailable
+        res.json({ valid: true, issues: [], suggestions: [] });
+    }
+});
+
+// 2. Validate founder description (detect hidden phone numbers/contacts)
+app.post('/api/ai/validate-description', async (req, res) => {
+    const { description } = req.body;
+    try {
+        const model = getGeminiModel();
+        const prompt = `You are a content moderator for a lost & found app.
+Check if the following description contains any contact information that should not be there.
+
+Description: "${description || ''}"
+
+Check for:
+1. Phone numbers (any format: 9876543210, +91-98765-43210, 98765 43210, etc.)
+2. Email addresses
+3. WhatsApp numbers or links
+4. Social media handles (@username, facebook.com/...)
+5. Any other direct contact bypass attempts
+
+Respond ONLY with this JSON (no markdown, no explanation):
+{
+  "valid": true/false,
+  "reason": "explanation if invalid, empty string if valid",
+  "detected": ["detected contact info if any"]
+}`;
+
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim()
+            .replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+        const parsed = JSON.parse(text);
+        res.json(parsed);
+    } catch (err: any) {
+        console.error('AI validate-description error:', err.message);
+        res.json({ valid: true, reason: '', detected: [] });
+    }
+});
+
+// 3. Validate Q&A answers using semantic similarity
+app.post('/api/ai/validate-answers', async (req, res) => {
+    const { questions } = req.body;
+    // questions: Array of { question: string, correctAnswer: string, userAnswer: string }
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+        return res.status(400).json({ error: 'questions array required' });
+    }
+    try {
+        const model = getGeminiModel();
+        const qList = questions.map((q: any, i: number) =>
+            `Q${i + 1}: "${q.question}"\n  Correct Answer: "${q.correctAnswer}"\n  User Answer: "${q.userAnswer}"`
+        ).join('\n\n');
+
+        const prompt = `You are a lost item claim verifier.
+A founder set security questions about a found item. A claimant is trying to claim it by answering those questions.
+Judge if the claimant's answers are semantically correct — allow reasonable variations:
+- Colour: "black" = "dark", "jet black", "charcoal", "dark grey" ✓
+- Brand: "Samsung" = "samsung", "SAMSUNG" ✓ but "Apple" ✗
+- Size: "medium" = "M", "med" ✓
+- Material: "leather" = "leatherette", "faux leather" ✓
+- Minor spelling errors are acceptable
+- Completely wrong answers are not acceptable
+
+Questions and answers:
+${qList}
+
+Respond ONLY with this JSON (no markdown, no explanation):
+{
+  "allCorrect": true/false,
+  "results": [
+    { "index": 0, "correct": true/false, "similarity": 85, "feedback": "Your answer is acceptable" }
+  ],
+  "overallFeedback": "All answers matched!" or "Question 2 answer doesn't match. Hint: think about the color."
+}`;
+
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim()
+            .replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+        const parsed = JSON.parse(text);
+        res.json(parsed);
+    } catch (err: any) {
+        console.error('AI validate-answers error:', err.message);
+        // Fallback to exact match if AI fails
+        const allCorrect = questions.every((q: any) =>
+            q.userAnswer.toLowerCase().trim() === q.correctAnswer.toLowerCase().trim()
+        );
+        res.json({
+            allCorrect,
+            results: questions.map((q: any, i: number) => ({
+                index: i,
+                correct: q.userAnswer.toLowerCase().trim() === q.correctAnswer.toLowerCase().trim(),
+                similarity: 100,
+                feedback: ''
+            })),
+            overallFeedback: allCorrect ? 'All answers matched!' : 'One or more answers are incorrect.'
+        });
+    }
+});
 
 // ============= CAPTCHA Endpoints =============
 

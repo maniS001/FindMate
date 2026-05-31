@@ -9,6 +9,7 @@ import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { API_URL } from '../../constants/api';
 import { addComplaint } from '../../store';
 import { showAlert } from '../../utils/alert';
 
@@ -17,6 +18,8 @@ export default function FileComplaint() {
     const { colors } = useTheme();
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiFeedback, setAiFeedback] = useState<{ issues: string[]; suggestions: string[] } | null>(null);
 
     const [form, setForm] = useState({
         name: '',
@@ -34,9 +37,34 @@ export default function FileComplaint() {
             return;
         }
 
+        // --- AI Validation ---
+        setAiLoading(true);
+        setAiFeedback(null);
+        try {
+            const aiRes = await fetch(`${API_URL}/ai/validate-complaint`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: form.name + ' ' + form.category,
+                    description: form.description,
+                    location: form.location,
+                    date: date.toISOString().split('T')[0],
+                }),
+            });
+            const aiData = await aiRes.json();
+            if (!aiData.valid && aiData.issues?.length > 0) {
+                setAiFeedback({ issues: aiData.issues, suggestions: aiData.suggestions || [] });
+                setAiLoading(false);
+                return; // Block submission
+            }
+        } catch {
+            // AI unavailable — allow submission
+        }
+        setAiLoading(false);
+        // --- End AI Validation ---
+
         setLoading(true);
         try {
-            // Convert images to base64
             const { convertImagesToBase64 } = await import('../../utils/imageUtils');
             const base64Images = form.imageUris.length > 0
                 ? await convertImagesToBase64(form.imageUris)
@@ -50,9 +78,8 @@ export default function FileComplaint() {
                 description: form.description,
                 contactInfo: form.contactInfo,
                 imageUris: base64Images,
-                userId: user?.id, // Link to current user
+                userId: user?.id,
             });
-            // Navigate to success screen
             router.push({
                 pathname: '/success',
                 params: { type: 'complaint' }
@@ -132,10 +159,28 @@ export default function FileComplaint() {
                             initialImages={form.imageUris}
                         />
 
+                        {/* AI Feedback Banner */}
+                        {aiFeedback && (
+                            <View style={styles.aiBanner}>
+                                <Text style={styles.aiBannerTitle}>⚠️ AI Review: Please fix the following</Text>
+                                {aiFeedback.issues.map((issue, i) => (
+                                    <Text key={i} style={styles.aiIssue}>• {issue}</Text>
+                                ))}
+                                {aiFeedback.suggestions.length > 0 && (
+                                    <>
+                                        <Text style={styles.aiSuggestTitle}>💡 Suggestions:</Text>
+                                        {aiFeedback.suggestions.map((s, i) => (
+                                            <Text key={i} style={styles.aiSuggest}>• {s}</Text>
+                                        ))}
+                                    </>
+                                )}
+                            </View>
+                        )}
+
                         <Button
-                            title="Submit Complaint"
+                            title={aiLoading ? 'AI Checking...' : 'Submit Complaint'}
                             onPress={handleSubmit}
-                            loading={loading}
+                            loading={loading || aiLoading}
                             style={{ marginTop: 24 }}
                         />
                     </View>
@@ -164,5 +209,36 @@ const styles = StyleSheet.create({
     },
     form: {
         gap: 8,
+    },
+    aiBanner: {
+        backgroundColor: '#FFF3CD',
+        borderColor: '#F59E0B',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 16,
+        gap: 6,
+    },
+    aiBannerTitle: {
+        fontWeight: '700',
+        color: '#92400E',
+        fontSize: 14,
+        marginBottom: 4,
+    },
+    aiIssue: {
+        color: '#B45309',
+        fontSize: 13,
+        lineHeight: 20,
+    },
+    aiSuggestTitle: {
+        fontWeight: '600',
+        color: '#065F46',
+        fontSize: 13,
+        marginTop: 8,
+    },
+    aiSuggest: {
+        color: '#047857',
+        fontSize: 13,
+        lineHeight: 20,
     },
 });

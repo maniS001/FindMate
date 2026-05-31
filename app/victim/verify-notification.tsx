@@ -9,6 +9,7 @@ import Input from '../../components/Input';
 import OtpModal from '../../components/OtpModal';
 import PaymentModal from '../../components/PaymentModal';
 import { CONFIG } from '../../constants/config';
+import { API_URL } from '../../constants/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import { updateComplaintStatus } from '../../store';
 import { showAlert } from '../../utils/alert';
@@ -87,7 +88,7 @@ export default function VerifyNotificationScreen() {
         setIsPaid(true);
     };
 
-    // --- Step 4: Security Questions ---
+    // --- Step 4: Security Questions (AI Semantic Matching) ---
     const handleAnswerChange = (text: string, index: number) => {
         const newAnswers = [...answers];
         newAnswers[index] = text;
@@ -95,16 +96,29 @@ export default function VerifyNotificationScreen() {
     };
 
     const handleVerifyAnswers = async () => {
+        const allFilled = questions.every((_: any, i: number) => (answers[i] || '').trim().length > 0);
+        if (!allFilled) {
+            showAlert('Incomplete', 'Please answer all security questions.');
+            return;
+        }
         setLoading(true);
-        // Simulate network delay
-        setTimeout(async () => {
-            const isCorrect = questions.every((q: any, index: number) => {
-                const userAnswer = answers[index] || '';
-                return userAnswer.toLowerCase().trim() === q.answer.toLowerCase().trim();
-            });
+        try {
+            // Build payload for AI
+            const payload = questions.map((q: any, i: number) => ({
+                question: q.question,
+                correctAnswer: q.answer,
+                userAnswer: answers[i] || '',
+            }));
 
-            if (isCorrect) {
-                // Auto-close the complaint if it's correct
+            const res = await fetch(`${API_URL}/ai/validate-answers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ questions: payload }),
+            });
+            const data = await res.json();
+
+            if (data.allCorrect) {
+                // Auto-close the complaint
                 if (complaintId) {
                     try {
                         await updateComplaintStatus(complaintId, 'CLOSED', 'Founder contacted via Notification');
@@ -114,10 +128,27 @@ export default function VerifyNotificationScreen() {
                 }
                 setShowSuccess(true);
             } else {
+                showAlert('Verification Failed', data.overallFeedback || 'One or more answers are incorrect. Please try again.');
+            }
+        } catch (e) {
+            // AI unavailable — fallback to exact match
+            const isCorrect = questions.every((q: any, index: number) => {
+                const userAnswer = answers[index] || '';
+                return userAnswer.toLowerCase().trim() === q.answer.toLowerCase().trim();
+            });
+            if (isCorrect) {
+                if (complaintId) {
+                    try {
+                        await updateComplaintStatus(complaintId, 'CLOSED', 'Founder contacted via Notification');
+                    } catch { }
+                }
+                setShowSuccess(true);
+            } else {
                 showAlert('Verification Failed', 'One or more answers are incorrect. Please try again.');
             }
+        } finally {
             setLoading(false);
-        }, 1000);
+        }
     };
 
     // Render Success Screen
@@ -236,7 +267,7 @@ export default function VerifyNotificationScreen() {
                             </View>
 
                             <Button
-                                title="Verify & Reveal Contact"
+                                title={loading ? 'AI Verifying...' : 'Verify & Reveal Contact'}
                                 onPress={handleVerifyAnswers}
                                 loading={loading}
                                 disabled={loading || questions.length === 0}

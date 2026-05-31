@@ -7,6 +7,7 @@ import CategoryPicker from '../../components/CategoryPicker';
 import DatePicker from '../../components/DatePicker';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
+import { API_URL } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { addItem } from '../../store';
@@ -17,6 +18,9 @@ export default function ReportFoundItem() {
     const { colors } = useTheme();
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [descError, setDescError] = useState('');
+
     const [form, setForm] = useState({
         name: '',
         category: '',
@@ -47,6 +51,26 @@ export default function ReportFoundItem() {
         setForm({ ...form, questions: newQuestions });
     };
 
+    // AI validate description when user finishes typing
+    const handleDescriptionBlur = async () => {
+        if (!form.description.trim() || form.description.trim().length < 10) return;
+        try {
+            const res = await fetch(`${API_URL}/ai/validate-description`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description: form.description }),
+            });
+            const data = await res.json();
+            if (!data.valid) {
+                setDescError(`⚠️ ${data.reason} Please remove any contact info from the description.`);
+            } else {
+                setDescError('');
+            }
+        } catch {
+            // AI unavailable — allow
+        }
+    };
+
     const handleSubmit = async () => {
         const areQuestionsValid = form.questions.every(q => q.question.trim() && q.answer.trim());
 
@@ -55,9 +79,35 @@ export default function ReportFoundItem() {
             return;
         }
 
+        // Block if description has contact info detected
+        if (descError) {
+            showAlert('Invalid Description', 'Please remove phone numbers or contact info from the description before submitting.');
+            return;
+        }
+
+        // Re-validate description on submit for safety
+        if (form.description.trim().length > 0) {
+            setAiLoading(true);
+            try {
+                const res = await fetch(`${API_URL}/ai/validate-description`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ description: form.description }),
+                });
+                const data = await res.json();
+                if (!data.valid) {
+                    setDescError(`⚠️ ${data.reason} Please remove any contact info from the description.`);
+                    setAiLoading(false);
+                    return;
+                }
+            } catch {
+                // AI unavailable — allow
+            }
+            setAiLoading(false);
+        }
+
         setLoading(true);
         try {
-            // Convert images to base64
             const { convertImagesToBase64 } = await import('../../utils/imageUtils');
             const base64Images = form.imageUris.length > 0
                 ? await convertImagesToBase64(form.imageUris)
@@ -72,7 +122,7 @@ export default function ReportFoundItem() {
                 contactInfo: form.contactInfo,
                 imageUris: base64Images,
                 questions: form.questions,
-                userId: user?.id, // Link to current user
+                userId: user?.id,
             });
             router.push({
                 pathname: '/success',
@@ -134,15 +184,25 @@ export default function ReportFoundItem() {
                             onChange={setDate}
                         />
 
+                        {/* Description with AI phone-number detection */}
                         <Input
                             label="Description (Visible to public)"
-                            placeholder="Brief description..."
+                            placeholder="Brief description of the item (no phone numbers)..."
                             multiline
                             numberOfLines={3}
                             style={{ height: 80, textAlignVertical: 'top' }}
                             value={form.description}
-                            onChangeText={(text) => setForm({ ...form, description: text })}
+                            onChangeText={(text) => {
+                                setForm({ ...form, description: text });
+                                if (descError) setDescError('');
+                            }}
+                            onBlur={handleDescriptionBlur}
                         />
+                        {!!descError && (
+                            <View style={styles.descErrorBox}>
+                                <Text style={styles.descErrorText}>{descError}</Text>
+                            </View>
+                        )}
 
                         <View style={[styles.divider, { backgroundColor: colors.border }]} />
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>Verification Details</Text>
@@ -196,9 +256,9 @@ export default function ReportFoundItem() {
                         />
 
                         <Button
-                            title="Report Item"
+                            title={aiLoading ? 'AI Checking...' : 'Report Item'}
                             onPress={handleSubmit}
-                            loading={loading}
+                            loading={loading || aiLoading}
                             style={{ marginTop: 8 }}
                         />
                     </View>
@@ -225,7 +285,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         marginBottom: 12,
     },
-
     form: {
         gap: 8,
     },
@@ -254,5 +313,18 @@ const styles = StyleSheet.create({
     questionLabel: {
         fontSize: 14,
         fontWeight: '600',
+    },
+    descErrorBox: {
+        backgroundColor: '#FEE2E2',
+        borderColor: '#FCA5A5',
+        borderWidth: 1,
+        borderRadius: 10,
+        padding: 12,
+        marginTop: 4,
+    },
+    descErrorText: {
+        color: '#B91C1C',
+        fontSize: 13,
+        lineHeight: 20,
     },
 });
