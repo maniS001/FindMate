@@ -8,6 +8,7 @@ import DatePicker from '../../components/DatePicker';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
 import { useTheme } from '../../contexts/ThemeContext';
+import { API_URL } from '../../constants/api';
 import { getItemById, updateItem } from '../../store';
 import { showAlert } from '../../utils/alert';
 
@@ -16,6 +17,8 @@ export default function EditFoundItem() {
     const router = useRouter();
     const { colors } = useTheme();
     const [loading, setLoading] = useState(false);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [descError, setDescError] = useState('');
     const [fetching, setFetching] = useState(true);
     const [form, setForm] = useState({
         name: '',
@@ -83,6 +86,25 @@ export default function EditFoundItem() {
             showAlert('Missing Information', 'Please fill in all required fields, including all security questions and answers.');
             return;
         }
+
+        setDescError('');
+        setAiLoading(true);
+        try {
+            const res = await fetch(`${API_URL}/ai/validate-founder-report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...form, date: date.toISOString().split('T')[0] }),
+            });
+            const data = await res.json();
+            if (!data.valid) {
+                setDescError(`⚠️ ${data.reason}\n${(data.issues || []).join('\n')}`);
+                setAiLoading(false);
+                return;
+            }
+        } catch {
+            // AI unavailable — allow
+        }
+        setAiLoading(false);
 
         setLoading(true);
         try {
@@ -230,8 +252,16 @@ export default function EditFoundItem() {
                             numberOfLines={3}
                             style={{ height: 80, textAlignVertical: 'top' }}
                             value={form.description}
-                            onChangeText={(text) => setForm({ ...form, description: text })}
+                            onChangeText={(text) => {
+                                setForm({ ...form, description: text });
+                                if (descError) setDescError('');
+                            }}
                         />
+                        {!!descError && (
+                            <View style={{ backgroundColor: colors.error + '1A', padding: 12, borderRadius: 8, marginTop: 4 }}>
+                                <Text style={{ color: colors.error, fontSize: 14 }}>{descError}</Text>
+                            </View>
+                        )}
 
                         <View style={[styles.divider, { backgroundColor: colors.border }]} />
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>Verification Questions</Text>
@@ -289,9 +319,9 @@ export default function EditFoundItem() {
                                 style={{ flex: 1 }}
                             />
                             <Button
-                                title="Update Item"
+                                title={aiLoading ? 'AI Checking...' : 'Update Item'}
                                 onPress={handleSubmit}
-                                loading={loading}
+                                loading={loading || aiLoading}
                                 style={{ flex: 1 }}
                             />
                         </View>

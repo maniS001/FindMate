@@ -33,6 +33,9 @@ export default function VerifyNotificationScreen() {
     // State for Security Questions
     const [loading, setLoading] = useState(false);
     const [answers, setAnswers] = useState<string[]>([]);
+    const [isSemanticPhase, setIsSemanticPhase] = useState(false);
+    const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+    const [followUpAnswers, setFollowUpAnswers] = useState<string[]>([]);
     const [showSuccess, setShowSuccess] = useState(false);
 
     let data: any = {};
@@ -88,14 +91,59 @@ export default function VerifyNotificationScreen() {
         setIsPaid(true);
     };
 
-    // --- Step 4: Security Questions (AI Semantic Matching) ---
-    const handleAnswerChange = (text: string, index: number) => {
-        const newAnswers = [...answers];
-        newAnswers[index] = text;
-        setAnswers(newAnswers);
+    const handleAnswerChange = (text: string, index: number, isFollowUp = false) => {
+        if (isFollowUp) {
+            const newAnswers = [...followUpAnswers];
+            newAnswers[index] = text;
+            setFollowUpAnswers(newAnswers);
+        } else {
+            const newAnswers = [...answers];
+            newAnswers[index] = text;
+            setAnswers(newAnswers);
+        }
     };
 
     const handleVerifyAnswers = async () => {
+        if (isSemanticPhase) {
+            const allFilled = followUpQuestions.every((_, i) => (followUpAnswers[i] || '').trim().length > 0);
+            if (!allFilled) {
+                showAlert('Incomplete', 'Please answer all follow-up questions.');
+                return;
+            }
+            setLoading(true);
+            try {
+                const payload = followUpQuestions.map((q, i) => ({
+                    question: q,
+                    correctAnswer: 'Verify logically using founder report context.',
+                    userAnswer: followUpAnswers[i] || '',
+                }));
+                const res = await fetch(`${API_URL}/ai/validate-answers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        questions: payload,
+                        founderReportData: { name: data.name, description: data.description }
+                    }),
+                });
+                const resultData = await res.json();
+                if (resultData.status === 'exact' || resultData.status === 'semantic') {
+                    if (complaintId) await updateComplaintStatus(complaintId, 'CLOSED', 'Founder contacted');
+                    setShowSuccess(true);
+                } else {
+                    showAlert('Verification Failed', resultData.reason || 'Answers are incorrect.');
+                    setIsSemanticPhase(false);
+                    setFollowUpQuestions([]);
+                    setFollowUpAnswers([]);
+                }
+            } catch {
+                showAlert('Error', 'Verification failed.');
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
+        // Phase 1 (Original questions)
         const allFilled = questions.every((_: any, i: number) => (answers[i] || '').trim().length > 0);
         if (!allFilled) {
             showAlert('Incomplete', 'Please answer all security questions.');
@@ -103,7 +151,6 @@ export default function VerifyNotificationScreen() {
         }
         setLoading(true);
         try {
-            // Build payload for AI
             const payload = questions.map((q: any, i: number) => ({
                 question: q.question,
                 correctAnswer: q.answer,
@@ -113,38 +160,33 @@ export default function VerifyNotificationScreen() {
             const res = await fetch(`${API_URL}/ai/validate-answers`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ questions: payload }),
+                body: JSON.stringify({ 
+                    questions: payload,
+                    founderReportData: { name: data.name, description: data.description }
+                }),
             });
-            const data = await res.json();
+            const resultData = await res.json();
 
-            if (data.allCorrect) {
-                // Auto-close the complaint
-                if (complaintId) {
-                    try {
-                        await updateComplaintStatus(complaintId, 'CLOSED', 'Founder contacted via Notification');
-                    } catch (error) {
-                        console.error('Failed to auto-close complaint', error);
-                    }
-                }
+            if (resultData.status === 'exact') {
+                if (complaintId) await updateComplaintStatus(complaintId, 'CLOSED', 'Founder contacted');
                 setShowSuccess(true);
+            } else if (resultData.status === 'semantic') {
+                setFollowUpQuestions(resultData.followUpQuestions || []);
+                setIsSemanticPhase(true);
             } else {
-                showAlert('Verification Failed', data.overallFeedback || 'One or more answers are incorrect. Please try again.');
+                showAlert('Verification Failed', resultData.reason || 'Answers are incorrect.');
             }
         } catch (e) {
-            // AI unavailable — fallback to exact match
+            // Fallback
             const isCorrect = questions.every((q: any, index: number) => {
                 const userAnswer = answers[index] || '';
                 return userAnswer.toLowerCase().trim() === q.answer.toLowerCase().trim();
             });
             if (isCorrect) {
-                if (complaintId) {
-                    try {
-                        await updateComplaintStatus(complaintId, 'CLOSED', 'Founder contacted via Notification');
-                    } catch { }
-                }
+                if (complaintId) await updateComplaintStatus(complaintId, 'CLOSED', 'Founder contacted');
                 setShowSuccess(true);
             } else {
-                showAlert('Verification Failed', 'One or more answers are incorrect. Please try again.');
+                showAlert('Verification Failed', 'One or more answers are incorrect.');
             }
         } finally {
             setLoading(false);
@@ -251,19 +293,40 @@ export default function VerifyNotificationScreen() {
                             )}
 
                             <View style={styles.form}>
-                                {questions.map((q: any, index: number) => (
-                                    <View key={index} style={styles.questionContainer}>
-                                        <Text style={[styles.questionText, { color: colors.text }]}>
-                                            {index + 1}. {q.question}
+                                {isSemanticPhase ? (
+                                    <>
+                                        <Text style={{ color: colors.primary, fontWeight: '600', marginBottom: 8 }}>
+                                            AI Follow-up: You're close! Please answer these additional questions to prove ownership.
                                         </Text>
-                                        <Input
-                                            label={`Answer ${index + 1}`}
-                                            placeholder="Your Answer"
-                                            value={answers[index] || ''}
-                                            onChangeText={(text) => handleAnswerChange(text, index)}
-                                        />
-                                    </View>
-                                ))}
+                                        {followUpQuestions.map((q: string, index: number) => (
+                                            <View key={index} style={styles.questionContainer}>
+                                                <Text style={[styles.questionText, { color: colors.text }]}>
+                                                    {index + 1}. {q}
+                                                </Text>
+                                                <Input
+                                                    label={`Follow-up Answer ${index + 1}`}
+                                                    placeholder="Your Answer"
+                                                    value={followUpAnswers[index] || ''}
+                                                    onChangeText={(text) => handleAnswerChange(text, index, true)}
+                                                />
+                                            </View>
+                                        ))}
+                                    </>
+                                ) : (
+                                    questions.map((q: any, index: number) => (
+                                        <View key={index} style={styles.questionContainer}>
+                                            <Text style={[styles.questionText, { color: colors.text }]}>
+                                                {index + 1}. {q.question}
+                                            </Text>
+                                            <Input
+                                                label={`Answer ${index + 1}`}
+                                                placeholder="Your Answer"
+                                                value={answers[index] || ''}
+                                                onChangeText={(text) => handleAnswerChange(text, index, false)}
+                                            />
+                                        </View>
+                                    ))
+                                )}
                             </View>
 
                             <Button

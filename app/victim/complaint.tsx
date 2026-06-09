@@ -31,6 +31,29 @@ export default function FileComplaint() {
     });
     const [date, setDate] = useState(new Date());
 
+    const handleAutoGenerate = async () => {
+        if (!form.name || !form.category || !form.location) {
+            showAlert('Missing Information', 'Please fill Item Name, Category, and Location first.');
+            return;
+        }
+        try {
+            const res = await fetch(`${API_URL}/ai/generate-description`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    name: form.name, category: form.category, 
+                    location: form.location, date: date.toISOString().split('T')[0] 
+                }),
+            });
+            const data = await res.json();
+            if (data.description) {
+                setForm(prev => ({ ...prev, description: data.description }));
+            }
+        } catch {
+            showAlert('Error', 'Failed to auto-generate description.');
+        }
+    };
+
     const handleSubmit = async () => {
         if (!form.name || !form.category || !form.location || !form.contactInfo) {
             showAlert('Missing Information', 'Please fill in all required fields.');
@@ -136,8 +159,13 @@ export default function FileComplaint() {
                             onChange={setDate}
                         />
 
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, flex: 1 }}>Description</Text>
+                            <TouchableOpacity onPress={handleAutoGenerate} style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 }}>
+                                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>✨ Auto-Generate</Text>
+                            </TouchableOpacity>
+                        </View>
                         <Input
-                            label="Description"
                             placeholder="Additional details about the item..."
                             value={form.description}
                             onChangeText={(text) => setForm({ ...form, description: text })}

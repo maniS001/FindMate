@@ -55,19 +55,43 @@ export default function ReportFoundItem() {
     const handleDescriptionBlur = async () => {
         if (!form.description.trim() || form.description.trim().length < 10) return;
         try {
-            const res = await fetch(`${API_URL}/ai/validate-description`, {
+            const res = await fetch(`${API_URL}/ai/validate-founder-report`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ description: form.description }),
+                body: JSON.stringify({ ...form, date: date.toISOString().split('T')[0] }),
             });
             const data = await res.json();
             if (!data.valid) {
-                setDescError(`⚠️ ${data.reason} Please remove any contact info from the description.`);
+                setDescError(`⚠️ ${data.reason}`);
             } else {
                 setDescError('');
             }
         } catch {
             // AI unavailable — allow
+        }
+    };
+
+    const handleAutoGenerate = async () => {
+        if (!form.name || !form.category || !form.location) {
+            showAlert('Missing Information', 'Please fill Item Name, Category, and Location first.');
+            return;
+        }
+        setDescError('');
+        try {
+            const res = await fetch(`${API_URL}/ai/generate-description`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    name: form.name, category: form.category, 
+                    location: form.location, date: date.toISOString().split('T')[0] 
+                }),
+            });
+            const data = await res.json();
+            if (data.description) {
+                setForm(prev => ({ ...prev, description: data.description }));
+            }
+        } catch {
+            showAlert('Error', 'Failed to auto-generate description.');
         }
     };
 
@@ -85,26 +109,24 @@ export default function ReportFoundItem() {
             return;
         }
 
-        // Re-validate description on submit for safety
-        if (form.description.trim().length > 0) {
-            setAiLoading(true);
-            try {
-                const res = await fetch(`${API_URL}/ai/validate-description`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ description: form.description }),
-                });
-                const data = await res.json();
-                if (!data.valid) {
-                    setDescError(`⚠️ ${data.reason} Please remove any contact info from the description.`);
-                    setAiLoading(false);
-                    return;
-                }
-            } catch {
-                // AI unavailable — allow
+        // Re-validate entire report on submit for safety
+        setAiLoading(true);
+        try {
+            const res = await fetch(`${API_URL}/ai/validate-founder-report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...form, date: date.toISOString().split('T')[0] }),
+            });
+            const data = await res.json();
+            if (!data.valid) {
+                setDescError(`⚠️ ${data.reason}\n${(data.issues || []).join('\n')}`);
+                setAiLoading(false);
+                return;
             }
-            setAiLoading(false);
+        } catch {
+            // AI unavailable — allow
         }
+        setAiLoading(false);
 
         setLoading(true);
         try {
@@ -184,9 +206,14 @@ export default function ReportFoundItem() {
                             onChange={setDate}
                         />
 
-                        {/* Description with AI phone-number detection */}
+                        {/* Description with AI generation & validation */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, flex: 1 }}>Description (Visible to public)</Text>
+                            <TouchableOpacity onPress={handleAutoGenerate} style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 }}>
+                                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>✨ Auto-Generate</Text>
+                            </TouchableOpacity>
+                        </View>
                         <Input
-                            label="Description (Visible to public)"
                             placeholder="Brief description of the item (no phone numbers)..."
                             multiline
                             numberOfLines={3}

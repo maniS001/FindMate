@@ -92,7 +92,15 @@ const geminiClient = process.env.GEMINI_API_KEY
 
 const getGeminiModel = () => {
     if (!geminiClient) throw new Error('GEMINI_API_KEY not configured');
-    return geminiClient.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    return geminiClient.getGenerativeModel({ 
+        model: 'gemini-2.5-flash',
+        systemInstruction: `You are the dedicated AI Agent for FindMate, a modern Lost & Found application.
+Your primary goals are to:
+1. Ensure all lost and found item reports are logically consistent, genuine, and high quality.
+2. Strictly protect user privacy by blocking any attempts to share phone numbers, emails, or social media handles in public descriptions.
+3. Prevent fraud by carefully analyzing the context of claims and security questions.
+Always respond exactly in the requested JSON format without markdown formatting.`
+    });
 };
 
 // ============= AI Validation Endpoints =============
@@ -135,8 +143,48 @@ Respond ONLY with this JSON (no markdown, no explanation):
         res.json(parsed);
     } catch (err: any) {
         console.error('AI validate-complaint error:', err.message);
-        // Fail open — don't block submission if AI is unavailable
         res.json({ valid: true, issues: [], suggestions: [] });
+    }
+});
+
+// 1b. Validate founder report form fields
+app.post('/api/ai/validate-founder-report', async (req, res) => {
+    const { name, category, location, date, description, questions } = req.body;
+    try {
+        const model = getGeminiModel();
+        const qList = (questions || []).map((q: any, i: number) => `Q${i+1}: ${q.question} (Answer: ${q.answer})`).join('\n');
+        const prompt = `You are a lost & found claim validator.
+Check this founder report for logical consistency and security.
+
+Fields:
+- Name: "${name || ''}"
+- Category: "${category || ''}"
+- Location: "${location || ''}"
+- Date: "${date || ''}"
+- Description: "${description || ''}"
+- Security Questions:
+${qList}
+
+Rules:
+1. Product name and category must logically match.
+2. Location must be a realistic place.
+3. Security questions must be highly relevant to the item.
+4. STRICTLY BLOCK any phone numbers, emails, or social media links in the description or questions.
+
+Respond ONLY with JSON:
+{
+  "valid": true/false,
+  "reason": "explanation if invalid, empty string if valid",
+  "issues": ["list of issues"],
+  "detectedContactInfo": ["any detected contact info"]
+}`;
+
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim().replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+        res.json(JSON.parse(text));
+    } catch (err: any) {
+        console.error('AI validate-founder-report error:', err.message);
+        res.json({ valid: true, reason: '', issues: [], detectedContactInfo: [] });
     }
 });
 
@@ -175,62 +223,82 @@ Respond ONLY with this JSON (no markdown, no explanation):
     }
 });
 
-// 3. Validate Q&A answers using semantic similarity
+// 2b. Auto-generate description
+app.post('/api/ai/generate-description', async (req, res) => {
+    const { name, category, location, date } = req.body;
+    try {
+        const model = getGeminiModel();
+        const prompt = `Write a professional, 2-3 sentence description for a lost/found item report.
+Do NOT include any placeholders, brackets, or contact information. Just write the natural text.
+Item: ${name}
+Category: ${category}
+Location: ${location}
+Date: ${date}
+
+Respond ONLY with the generated description text (no JSON, no markdown).`;
+
+        const result = await model.generateContent(prompt);
+        res.json({ description: result.response.text().trim() });
+    } catch (err: any) {
+        console.error('AI generate-description error:', err.message);
+        res.json({ description: '' });
+    }
+});
+
+// 3. Validate Q&A answers using mixed dynamic flow
 app.post('/api/ai/validate-answers', async (req, res) => {
-    const { questions } = req.body;
-    // questions: Array of { question: string, correctAnswer: string, userAnswer: string }
+    const { questions, founderReportData } = req.body;
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
         return res.status(400).json({ error: 'questions array required' });
     }
+    
+    // First, check for exact/near-exact matches locally
+    let allExact = true;
+    for (const q of questions) {
+        const u = q.userAnswer.toLowerCase().trim();
+        const c = q.correctAnswer.toLowerCase().trim();
+        if (u !== c && !c.includes(u) && !u.includes(c)) {
+            allExact = false;
+            break;
+        }
+    }
+    
+    if (allExact) {
+        return res.json({ status: 'exact', message: 'Perfect match.' });
+    }
+
     try {
         const model = getGeminiModel();
         const qList = questions.map((q: any, i: number) =>
-            `Q${i + 1}: "${q.question}"\n  Correct Answer: "${q.correctAnswer}"\n  User Answer: "${q.userAnswer}"`
+            `Q${i + 1}: "${q.question}"\n  Founder's Expected Answer: "${q.correctAnswer}"\n  Victim's Answer: "${q.userAnswer}"`
         ).join('\n\n');
 
         const prompt = `You are a lost item claim verifier.
-A founder set security questions about a found item. A claimant is trying to claim it by answering those questions.
-Judge if the claimant's answers are semantically correct — allow reasonable variations:
-- Colour: "black" = "dark", "jet black", "charcoal", "dark grey" ✓
-- Brand: "Samsung" = "samsung", "SAMSUNG" ✓ but "Apple" ✗
-- Size: "medium" = "M", "med" ✓
-- Material: "leather" = "leatherette", "faux leather" ✓
-- Minor spelling errors are acceptable
-- Completely wrong answers are not acceptable
+Evaluate if the victim's answers logically prove they own the item, even if they aren't the exact words the founder used.
+Founder's hidden report context:
+Name: ${founderReportData?.name || ''}
+Description: ${founderReportData?.description || ''}
 
 Questions and answers:
 ${qList}
 
-Respond ONLY with this JSON (no markdown, no explanation):
+If the answers are completely wrong, respond with status "wrong".
+If the answers are logically correct or very close (semantic match), respond with status "semantic" AND generate 2 follow-up questions based on the founder's hidden context to double-check their identity. Make the questions specific enough that only the owner would know, but don't ask about things not mentioned in the context.
+
+Respond ONLY with this JSON:
 {
-  "allCorrect": true/false,
-  "results": [
-    { "index": 0, "correct": true/false, "similarity": 85, "feedback": "Your answer is acceptable" }
-  ],
-  "overallFeedback": "All answers matched!" or "Question 2 answer doesn't match. Hint: think about the color."
+  "status": "wrong" | "semantic",
+  "followUpQuestions": ["Question 1?", "Question 2?"],
+  "reason": "Brief explanation of your decision"
 }`;
 
         const result = await model.generateContent(prompt);
-        const text = result.response.text().trim()
-            .replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+        const text = result.response.text().trim().replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
         const parsed = JSON.parse(text);
         res.json(parsed);
     } catch (err: any) {
         console.error('AI validate-answers error:', err.message);
-        // Fallback to exact match if AI fails
-        const allCorrect = questions.every((q: any) =>
-            q.userAnswer.toLowerCase().trim() === q.correctAnswer.toLowerCase().trim()
-        );
-        res.json({
-            allCorrect,
-            results: questions.map((q: any, i: number) => ({
-                index: i,
-                correct: q.userAnswer.toLowerCase().trim() === q.correctAnswer.toLowerCase().trim(),
-                similarity: 100,
-                feedback: ''
-            })),
-            overallFeedback: allCorrect ? 'All answers matched!' : 'One or more answers are incorrect.'
-        });
+        res.json({ status: 'wrong', message: 'Validation failed.' });
     }
 });
 

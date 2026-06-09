@@ -8,6 +8,7 @@ import DatePicker from '../../components/DatePicker';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
 import { useTheme } from '../../contexts/ThemeContext';
+import { API_URL } from '../../constants/api';
 import { getComplaintById, updateComplaint } from '../../store';
 import { showAlert } from '../../utils/alert';
 
@@ -17,6 +18,8 @@ export default function EditComplaint() {
     const { colors } = useTheme();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiFeedback, setAiFeedback] = useState<{ issues: string[]; suggestions: string[] } | null>(null);
 
     const [form, setForm] = useState({
         name: '',
@@ -68,6 +71,32 @@ export default function EditComplaint() {
             showAlert('Missing Information', 'Please fill in all required fields.');
             return;
         }
+
+        // --- AI Validation ---
+        setAiLoading(true);
+        setAiFeedback(null);
+        try {
+            const aiRes = await fetch(`${API_URL}/ai/validate-complaint`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: form.name + ' ' + form.category,
+                    description: form.description,
+                    location: form.location,
+                    date: date.toISOString().split('T')[0],
+                }),
+            });
+            const aiData = await aiRes.json();
+            if (!aiData.valid && aiData.issues?.length > 0) {
+                setAiFeedback({ issues: aiData.issues, suggestions: aiData.suggestions || [] });
+                setAiLoading(false);
+                return; // Block submission
+            }
+        } catch {
+            // AI unavailable — allow submission
+        }
+        setAiLoading(false);
+        // --- End AI Validation ---
 
         setSubmitting(true);
         try {
@@ -130,6 +159,14 @@ export default function EditComplaint() {
                     <Text style={[styles.heading, { color: colors.text }]}>Edit Report</Text>
 
                     <View style={styles.form}>
+                        {aiFeedback && (
+                            <View style={{ backgroundColor: colors.error + '1A', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+                                <Text style={{ color: colors.error, fontWeight: 'bold', marginBottom: 4 }}>Please fix the following issues:</Text>
+                                {aiFeedback.issues.map((issue, idx) => (
+                                    <Text key={idx} style={{ color: colors.error, fontSize: 13 }}>• {issue}</Text>
+                                ))}
+                            </View>
+                        )}
                         <Input
                             label="Item Name *"
                             placeholder="e.g. iPhone 13 Pro"
@@ -180,9 +217,9 @@ export default function EditComplaint() {
                         />
 
                         <Button
-                            title="Update Report"
+                            title={aiLoading ? 'AI Checking...' : 'Update Report'}
                             onPress={handleSubmit}
-                            loading={submitting}
+                            loading={submitting || aiLoading}
                             style={{ marginTop: 24 }}
                         />
                         <Button
