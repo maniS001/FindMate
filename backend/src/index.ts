@@ -137,8 +137,9 @@ Respond ONLY with this JSON (no markdown, no explanation):
 }`;
 
         const result = await model.generateContent(prompt);
-        const text = result.response.text().trim()
-            .replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+        let text = result.response.text().trim();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) text = jsonMatch[0];
         const parsed = JSON.parse(text);
         res.json(parsed);
     } catch (err: any) {
@@ -180,7 +181,9 @@ Respond ONLY with JSON:
 }`;
 
         const result = await model.generateContent(prompt);
-        const text = result.response.text().trim().replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+        let text = result.response.text().trim();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) text = jsonMatch[0];
         res.json(JSON.parse(text));
     } catch (err: any) {
         console.error('AI validate-founder-report error:', err.message);
@@ -213,8 +216,9 @@ Respond ONLY with this JSON (no markdown, no explanation):
 }`;
 
         const result = await model.generateContent(prompt);
-        const text = result.response.text().trim()
-            .replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+        let text = result.response.text().trim();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) text = jsonMatch[0];
         const parsed = JSON.parse(text);
         res.json(parsed);
     } catch (err: any) {
@@ -293,7 +297,9 @@ Respond ONLY with this JSON:
 }`;
 
         const result = await model.generateContent(prompt);
-        const text = result.response.text().trim().replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+        let text = result.response.text().trim();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) text = jsonMatch[0];
         const parsed = JSON.parse(text);
         res.json(parsed);
     } catch (err: any) {
