@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CategoryPicker from '../../components/CategoryPicker';
@@ -73,10 +73,58 @@ export default function EditFoundItem() {
         setForm({ ...form, questions: newQuestions });
     };
 
+    const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+
     const handleQuestionChange = (text: string, index: number, field: 'question' | 'answer') => {
         const newQuestions = [...form.questions];
         newQuestions[index][field] = text;
         setForm({ ...form, questions: newQuestions });
+    };
+
+    const handleDescriptionBlur = async () => {
+        if (!form.description.trim() || form.description.trim().length < 10) return;
+        try {
+            const res = await fetch(`${API_URL}/ai/validate-founder-report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...form, date: date.toISOString().split('T')[0] }),
+            });
+            const data = await res.json();
+            if (!data.valid) {
+                setDescError(`⚠️ ${data.reason}`);
+            } else {
+                setDescError('');
+            }
+        } catch {
+            // AI unavailable
+        }
+    };
+
+    const handleAutoGenerate = async () => {
+        if (!form.name || !form.category || !form.location) {
+            showAlert('Missing Information', 'Please fill Item Name, Category, and Location first.');
+            return;
+        }
+        setDescError('');
+        setIsGeneratingDesc(true);
+        try {
+            const res = await fetch(`${API_URL}/ai/generate-description`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    name: form.name, category: form.category, 
+                    location: form.location, date: date.toISOString().split('T')[0] 
+                }),
+            });
+            const data = await res.json();
+            if (data.description) {
+                setForm(prev => ({ ...prev, description: data.description }));
+            }
+        } catch {
+            showAlert('Error', 'Failed to auto-generate description.');
+        } finally {
+            setIsGeneratingDesc(false);
+        }
     };
 
     const handleSubmit = async () => {
@@ -245,8 +293,19 @@ export default function EditFoundItem() {
                             </>
                         )}
 
+                        {/* Description with AI generation & validation */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, flex: 1 }}>Description</Text>
+                            {itemStatus !== 'NOTIFIED' && (
+                                <TouchableOpacity onPress={handleAutoGenerate} disabled={isGeneratingDesc} style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    {isGeneratingDesc ? <ActivityIndicator size="small" color={colors.primary} /> : null}
+                                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
+                                        {isGeneratingDesc ? 'Generating...' : '✨ Auto-Generate'}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
                         <Input
-                            label="Description"
                             placeholder="Brief description..."
                             multiline
                             numberOfLines={3}
@@ -254,12 +313,12 @@ export default function EditFoundItem() {
                             value={form.description}
                             onChangeText={(text) => {
                                 setForm({ ...form, description: text });
-                                if (descError) setDescError('');
                             }}
+                            onBlur={handleDescriptionBlur}
                         />
                         {!!descError && (
-                            <View style={{ backgroundColor: colors.error + '1A', padding: 12, borderRadius: 8, marginTop: 4 }}>
-                                <Text style={{ color: colors.error, fontSize: 14 }}>{descError}</Text>
+                            <View style={{ backgroundColor: '#FFF3CD', borderColor: '#F59E0B', borderWidth: 1, borderRadius: 12, padding: 12, marginTop: -4, marginBottom: 16 }}>
+                                <Text style={{ color: '#B45309', fontSize: 13, lineHeight: 20 }}>{descError}</Text>
                             </View>
                         )}
 

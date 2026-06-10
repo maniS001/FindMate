@@ -79,8 +79,11 @@ export default function FileComplaint() {
                 }),
             });
             const aiData = await aiRes.json();
-            if (!aiData.valid && aiData.issues?.length > 0) {
-                setAiFeedback({ issues: aiData.issues, suggestions: aiData.suggestions || [] });
+            if (!aiData.valid) {
+                setAiFeedback({ 
+                    issues: aiData.issues?.length ? aiData.issues : [aiData.reason || 'Invalid data according to AI.'], 
+                    suggestions: aiData.suggestions || [] 
+                });
                 setAiLoading(false);
                 return; // Block submission
             }

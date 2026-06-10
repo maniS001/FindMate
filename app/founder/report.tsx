@@ -107,14 +107,9 @@ export default function ReportFoundItem() {
             return;
         }
 
-        // Block if description has contact info detected
-        if (descError) {
-            showAlert('Invalid Description', 'Please remove phone numbers or contact info from the description before submitting.');
-            return;
-        }
-
         // Re-validate entire report on submit for safety
         setAiLoading(true);
+        setDescError(''); // Clear old errors so it can be re-evaluated
         try {
             const res = await fetch(`${API_URL}/ai/validate-founder-report`, {
                 method: 'POST',
@@ -123,7 +118,9 @@ export default function ReportFoundItem() {
             });
             const data = await res.json();
             if (!data.valid) {
-                setDescError(`⚠️ ${data.reason}\n${(data.issues || []).join('\n')}`);
+                const errorMsg = `⚠️ ${data.reason}\n${(data.issues || []).join('\n')}`;
+                setDescError(errorMsg);
+                showAlert('Validation Error', data.reason || 'Please fix the issues in your report before submitting.');
                 setAiLoading(false);
                 return;
             }
