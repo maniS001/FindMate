@@ -93,7 +93,7 @@ const geminiClient = process.env.GEMINI_API_KEY
 const getGeminiModel = () => {
     if (!geminiClient) throw new Error('GEMINI_API_KEY not configured');
     return geminiClient.getGenerativeModel({ 
-        model: 'gemini-2.5-flash',
+        model: 'gemini-flash-latest',
         systemInstruction: `You are the dedicated AI Agent for FindMate, a modern Lost & Found application.
 Your primary goals are to:
 1. Ensure all lost and found item reports are logically consistent, genuine, and high quality.
