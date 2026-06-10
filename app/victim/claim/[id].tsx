@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../../components/Button';
-import Captcha from '../../../components/Captcha';
+import CaptchaWidget, { CaptchaRef } from '../../../components/CaptchaWidget';
 import Card from '../../../components/Card';
 import CustomImagePicker from '../../../components/ImagePicker';
 import Input from '../../../components/Input';
@@ -14,6 +14,7 @@ import { API_URL } from '../../../constants/api';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { getItemById, Item } from '../../../store';
 import { showAlert } from '../../../utils/alert';
+import { useRef } from 'react';
 
 export default function ClaimItem() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,6 +46,10 @@ export default function ClaimItem() {
     const [isPaid, setIsPaid] = useState(false);
 
     const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+    const [captchaLoading, setCaptchaLoading] = useState(false);
+    const [captchaError, setCaptchaError] = useState('');
+    const captchaRef = useRef<CaptchaRef>(null);
+
     const [isOtpVerified, setIsOtpVerified] = useState(false);
     const [verifiedPhone, setVerifiedPhone] = useState('');
 
@@ -73,13 +78,24 @@ export default function ClaimItem() {
         );
     }
 
-    const handleCaptchaVerify = async (isValid: boolean) => {
-        setIsCaptchaVerified(isValid);
-        if (isValid && !isOtpVerified) {
-            // Bypass OTP
+    const handleCaptchaSubmit = () => {
+        if (!captchaRef.current?.isFilled()) {
+            setCaptchaError('Please enter the CAPTCHA answer.');
+            return;
+        }
+        setCaptchaLoading(true);
+        setCaptchaError('');
+
+        const isCorrect = captchaRef.current.validate();
+        if (isCorrect) {
+            setIsCaptchaVerified(true);
             setIsOtpVerified(true);
             setVerifiedPhone('+15555555555');
+        } else {
+            setCaptchaError('Incorrect answer. Please try again.');
+            captchaRef.current?.refresh();
         }
+        setCaptchaLoading(false);
     };
 
     const handleVerify = async () => {
@@ -326,7 +342,19 @@ export default function ClaimItem() {
                                     Complete the security check to proceed with claiming this item.
                                 </Text>
                             </View>
-                            <Captcha onVerify={handleCaptchaVerify} />
+
+                            <CaptchaWidget ref={captchaRef} />
+                            
+                            {!!captchaError && (
+                                <Text style={{ color: colors.error, fontSize: 14, marginTop: 4 }}>{captchaError}</Text>
+                            )}
+
+                            <Button
+                                title="Verify CAPTCHA"
+                                onPress={handleCaptchaSubmit}
+                                loading={captchaLoading}
+                                style={{ marginTop: 12 }}
+                            />
                         </View>
                     ) : (
                         <View style={styles.verificationSection}>
