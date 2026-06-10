@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CategoryPicker from '../../components/CategoryPicker';
@@ -19,6 +19,7 @@ export default function FileComplaint() {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
+    const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
     const [aiFeedback, setAiFeedback] = useState<{ issues: string[]; suggestions: string[] } | null>(null);
 
     const [form, setForm] = useState({
@@ -36,6 +37,7 @@ export default function FileComplaint() {
             showAlert('Missing Information', 'Please fill Item Name, Category, and Location first.');
             return;
         }
+        setIsGeneratingDesc(true);
         try {
             const res = await fetch(`${API_URL}/ai/generate-description`, {
                 method: 'POST',
@@ -51,6 +53,8 @@ export default function FileComplaint() {
             }
         } catch {
             showAlert('Error', 'Failed to auto-generate description.');
+        } finally {
+            setIsGeneratingDesc(false);
         }
     };
 
@@ -161,8 +165,11 @@ export default function FileComplaint() {
 
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
                             <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, flex: 1 }}>Description</Text>
-                            <TouchableOpacity onPress={handleAutoGenerate} style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 }}>
-                                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>✨ Auto-Generate</Text>
+                            <TouchableOpacity onPress={handleAutoGenerate} disabled={isGeneratingDesc} style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                {isGeneratingDesc ? <ActivityIndicator size="small" color={colors.primary} /> : null}
+                                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
+                                    {isGeneratingDesc ? 'Generating...' : '✨ Auto-Generate'}
+                                </Text>
                             </TouchableOpacity>
                         </View>
                         <Input

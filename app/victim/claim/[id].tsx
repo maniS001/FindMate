@@ -8,9 +8,9 @@ import Captcha from '../../../components/Captcha';
 import Card from '../../../components/Card';
 import CustomImagePicker from '../../../components/ImagePicker';
 import Input from '../../../components/Input';
-import OtpModal from '../../../components/OtpModal';
 import PaymentModal from '../../../components/PaymentModal';
 import { CONFIG } from '../../../constants/config';
+import { API_URL } from '../../../constants/api';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { getItemById, Item } from '../../../store';
 import { showAlert } from '../../../utils/alert';
@@ -47,7 +47,11 @@ export default function ClaimItem() {
     const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
     const [isOtpVerified, setIsOtpVerified] = useState(false);
     const [verifiedPhone, setVerifiedPhone] = useState('');
-    const [showOtpModal, setShowOtpModal] = useState(false);
+
+    const [isSemanticPhase, setIsSemanticPhase] = useState(false);
+    const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+    const [followUpAnswers, setFollowUpAnswers] = useState<{ [key: number]: string }>({});
+    const [showSuccess, setShowSuccess] = useState(false);
 
     if (loading) {
         return (
@@ -69,34 +73,115 @@ export default function ClaimItem() {
         );
     }
 
-    const handleCaptchaVerify = (isValid: boolean) => {
+    const handleCaptchaVerify = async (isValid: boolean) => {
         setIsCaptchaVerified(isValid);
         if (isValid && !isOtpVerified) {
-            setTimeout(() => setShowOtpModal(true), 500);
+            // Bypass OTP
+            setIsOtpVerified(true);
+            setVerifiedPhone('+15555555555');
         }
     };
 
-    const handleOtpVerified = (phone: string) => {
-        setIsOtpVerified(true);
-        setVerifiedPhone(phone);
-        setShowOtpModal(false);
-    };
-
-    const handleVerify = () => {
-        const allCorrect = item.questions.every((q, index) => {
-            const userAnswer = answers[index] || '';
-            return userAnswer.toLowerCase().trim() === q.answer.toLowerCase().trim();
-        });
-
-        if (allCorrect) {
-            setIsVerified(true);
-            if (CONFIG.ENABLE_PAYMENT) {
-                setShowPaymentModal(true);
-            } else {
-                handlePaymentSuccess();
+    const handleVerify = async () => {
+        if (isSemanticPhase) {
+            const allFilled = followUpQuestions.every((_, i) => (followUpAnswers[i] || '').trim().length > 0);
+            if (!allFilled) {
+                showAlert('Incomplete', 'Please answer all follow-up questions.');
+                return;
             }
-        } else {
-            showAlert('❌ Incorrect Answer', 'One or more answers are incorrect. Please try again.');
+            setLoading(true);
+            try {
+                const payload = followUpQuestions.map((q, i) => ({
+                    question: q,
+                    correctAnswer: 'Verify logically using founder report context.',
+                    userAnswer: followUpAnswers[i] || '',
+                }));
+                const res = await fetch(`${API_URL}/ai/validate-answers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        questions: payload,
+                        founderReportData: { name: item.name, description: item.description }
+                    }),
+                });
+                const resultData = await res.json();
+                if (resultData.status === 'exact' || resultData.status === 'semantic') {
+                    setIsVerified(true);
+                    if (CONFIG.ENABLE_PAYMENT) {
+                        setShowPaymentModal(true);
+                    } else {
+                        handlePaymentSuccess();
+                    }
+                } else {
+                    showAlert('Verification Failed', resultData.reason || 'Answers are incorrect.');
+                    setIsSemanticPhase(false);
+                    setFollowUpQuestions([]);
+                    setFollowUpAnswers([]);
+                }
+            } catch {
+                showAlert('Error', 'Verification failed.');
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
+        const allFilled = item.questions.every((_, i) => (answers[i] || '').trim().length > 0);
+        if (!allFilled) {
+            showAlert('Incomplete', 'Please answer all security questions.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const payload = item.questions.map((q, i) => ({
+                question: q.question,
+                correctAnswer: q.answer,
+                userAnswer: answers[i] || '',
+            }));
+
+            const res = await fetch(`${API_URL}/ai/validate-answers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    questions: payload,
+                    founderReportData: { name: item.name, description: item.description }
+                }),
+            });
+            const resultData = await res.json();
+
+            if (resultData.status === 'exact') {
+                setIsVerified(true);
+                if (CONFIG.ENABLE_PAYMENT) {
+                    setShowPaymentModal(true);
+                } else {
+                    handlePaymentSuccess();
+                }
+            } else if (resultData.status === 'semantic') {
+                setFollowUpQuestions(resultData.followUpQuestions || []);
+                setIsSemanticPhase(true);
+            } else {
+                showAlert('Verification Failed', resultData.reason || 'Answers are incorrect.');
+            }
+        } catch (e) {
+            // Fallback to exact matching
+            const allCorrect = item.questions.every((q, index) => {
+                const userAnswer = answers[index] || '';
+                return userAnswer.toLowerCase().trim() === q.answer.toLowerCase().trim();
+            });
+
+            if (allCorrect) {
+                setIsVerified(true);
+                if (CONFIG.ENABLE_PAYMENT) {
+                    setShowPaymentModal(true);
+                } else {
+                    handlePaymentSuccess();
+                }
+            } else {
+                showAlert('❌ Incorrect Answer', 'One or more answers are incorrect. Please try again.');
+            }
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -219,16 +304,10 @@ export default function ClaimItem() {
                 onSuccess={handlePaymentSuccess}
             />
 
-            <OtpModal
-                visible={showOtpModal}
-                onClose={() => setShowOtpModal(false)}
-                onVerified={handleOtpVerified}
-            />
-
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
-                keyboardVerticalOffset={!isOtpVerified ? 100 : 0}
+                keyboardVerticalOffset={!isCaptchaVerified ? 100 : 0}
                 enabled
             >
                 <ScrollView
@@ -239,7 +318,7 @@ export default function ClaimItem() {
                         <Text style={[styles.pageTitle, { color: colors.text }]}>Claim Verification</Text>
                     </View>
 
-                    {!isOtpVerified ? (
+                    {!isCaptchaVerified ? (
                         <View style={styles.verificationSection}>
                             <View style={styles.warningBox}>
                                 <AlertCircle size={24} color="#B45309" />
@@ -254,33 +333,52 @@ export default function ClaimItem() {
                             <View style={styles.warningBox}>
                                 <AlertCircle size={24} color="#B45309" />
                                 <Text style={styles.warningText}>
-                                    To prevent fraud, you must answer the security questions set by the founder to reveal their contact info.
+                                    {isSemanticPhase 
+                                        ? "Your answers were close! To be absolutely sure, please answer these final specific questions about the item."
+                                        : "To prevent fraud, you must answer the security questions set by the founder to reveal their contact info."}
                                 </Text>
                             </View>
 
-                            <CustomImagePicker
-                                label="Upload Proof (Optional)"
-                                onImagesSelected={setProofImages}
-                                initialImages={proofImages}
-                            />
+                            {!isSemanticPhase && (
+                                <CustomImagePicker
+                                    label="Upload Proof (Optional)"
+                                    onImagesSelected={setProofImages}
+                                    initialImages={proofImages}
+                                />
+                            )}
 
-                            {item.questions.map((q, index) => (
-                                <View key={index} style={{ marginTop: 16 }}>
-                                    <Text style={[styles.questionLabel, { color: colors.textSecondary }]}>Question {index + 1}:</Text>
-                                    <Text style={[styles.question, { color: colors.text }]}>{q.question}</Text>
-
-                                    <Input
-                                        label="Your Answer"
-                                        placeholder="Type your answer here..."
-                                        value={answers[index] || ''}
-                                        onChangeText={(text) => setAnswers({ ...answers, [index]: text })}
-                                    />
-                                </View>
-                            ))}
+                            {isSemanticPhase ? (
+                                followUpQuestions.map((q, index) => (
+                                    <View key={`followup-${index}`} style={{ marginTop: 16 }}>
+                                        <Text style={[styles.questionLabel, { color: colors.textSecondary }]}>Follow-up {index + 1}:</Text>
+                                        <Text style={[styles.question, { color: colors.text }]}>{q}</Text>
+                                        <Input
+                                            label="Your Answer"
+                                            placeholder="Type your answer here..."
+                                            value={followUpAnswers[index] || ''}
+                                            onChangeText={(text) => setFollowUpAnswers({ ...followUpAnswers, [index]: text })}
+                                        />
+                                    </View>
+                                ))
+                            ) : (
+                                item.questions.map((q, index) => (
+                                    <View key={`q-${index}`} style={{ marginTop: 16 }}>
+                                        <Text style={[styles.questionLabel, { color: colors.textSecondary }]}>Question {index + 1}:</Text>
+                                        <Text style={[styles.question, { color: colors.text }]}>{q.question}</Text>
+                                        <Input
+                                            label="Your Answer"
+                                            placeholder="Type your answer here..."
+                                            value={answers[index] || ''}
+                                            onChangeText={(text) => setAnswers({ ...answers, [index]: text })}
+                                        />
+                                    </View>
+                                ))
+                            )}
 
                             <Button
-                                title="Verify & Claim"
+                                title={loading ? "Verifying..." : "Verify & Claim"}
                                 onPress={handleVerify}
+                                disabled={loading}
                                 style={{ marginTop: 24 }}
                             />
                         </View>
