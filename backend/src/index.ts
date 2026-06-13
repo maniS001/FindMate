@@ -233,16 +233,25 @@ app.post('/api/ai/generate-description', async (req, res) => {
     try {
         const model = getGeminiModel();
         const prompt = `Write a professional, 2-3 sentence description for a lost/found item report.
-Do NOT include any placeholders, brackets, or contact information. Just write the natural text.
+Do NOT include any placeholders, brackets, or contact information.
+CRITICAL: Do NOT hallucinate or assume any details like color, brand, condition, or specific features that are not explicitly provided. Stick strictly to the given facts.
+
 Item: ${name}
 Category: ${category}
 Location: ${location}
 Date: ${date}
 
-Respond ONLY with the generated description text (no JSON, no markdown).`;
+Respond ONLY with this JSON (no markdown, no explanation):
+{
+  "description": "the generated text description"
+}`;
 
         const result = await model.generateContent(prompt);
-        res.json({ description: result.response.text().trim() });
+        let text = result.response.text().trim();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) text = jsonMatch[0];
+        const parsed = JSON.parse(text);
+        res.json({ description: parsed.description || parsed.generated_description || text });
     } catch (err: any) {
         console.error('AI generate-description error:', err.message);
         res.json({ description: '' });
