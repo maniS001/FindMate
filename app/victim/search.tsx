@@ -8,6 +8,7 @@ import DatePicker from '../../components/DatePicker';
 import CustomImagePicker from '../../components/ImagePicker';
 import Input from '../../components/Input';
 import { useTheme } from '../../contexts/ThemeContext';
+import { API_URL } from '../../constants/api';
 
 export default function SearchLostItem() {
     const router = useRouter();
@@ -26,8 +27,10 @@ export default function SearchLostItem() {
         contactInfo: '',
     });
     const [date, setDate] = useState(new Date());
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiFeedback, setAiFeedback] = useState<{ issues: string[]; suggestions: string[] } | null>(null);
 
-    const handleSearch = () => {
+    const handleSearch = async () => {
         const newErrors = {
             name: !form.name ? 'Item name is required' : '',
             location: !form.location ? 'Location is required' : '',
@@ -39,6 +42,35 @@ export default function SearchLostItem() {
         if (newErrors.name || newErrors.location || newErrors.contactInfo) {
             return;
         }
+
+        // --- AI Validation ---
+        setAiLoading(true);
+        setAiFeedback(null);
+        try {
+            const aiRes = await fetch(`${API_URL}/ai/validate-complaint`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: form.name + ' ' + form.category,
+                    description: form.description,
+                    location: form.location,
+                    date: date.toISOString().split('T')[0],
+                }),
+            });
+            const aiData = await aiRes.json();
+            if (!aiData.valid) {
+                setAiFeedback({ 
+                    issues: aiData.issues?.length ? aiData.issues : [aiData.reason || 'Invalid data according to AI.'], 
+                    suggestions: aiData.suggestions || [] 
+                });
+                setAiLoading(false);
+                return; // Block search
+            }
+        } catch {
+            // AI unavailable — allow search
+        }
+        setAiLoading(false);
+        // --- End AI Validation ---
 
         router.push({
             pathname: '/victim/results',
@@ -127,9 +159,28 @@ export default function SearchLostItem() {
                             initialImages={form.imageUris}
                         />
 
+                        {/* AI Feedback Banner */}
+                        {aiFeedback && (
+                            <View style={styles.aiBanner}>
+                                <Text style={styles.aiBannerTitle}>⚠️ AI Review: Please fix the following</Text>
+                                {aiFeedback.issues.map((issue, i) => (
+                                    <Text key={i} style={styles.aiIssue}>• {issue}</Text>
+                                ))}
+                                {aiFeedback.suggestions.length > 0 && (
+                                    <>
+                                        <Text style={styles.aiSuggestTitle}>💡 Suggestions:</Text>
+                                        {aiFeedback.suggestions.map((s, i) => (
+                                            <Text key={i} style={styles.aiSuggest}>• {s}</Text>
+                                        ))}
+                                    </>
+                                )}
+                            </View>
+                        )}
+
                         <Button
-                            title="Search Items"
+                            title={aiLoading ? 'AI Checking...' : 'Search Items'}
                             onPress={handleSearch}
+                            loading={aiLoading}
                             style={{ marginTop: 24 }}
                         />
                     </View>
@@ -159,5 +210,36 @@ const styles = StyleSheet.create({
     },
     form: {
         gap: 8,
+    },
+    aiBanner: {
+        backgroundColor: '#FFF3CD',
+        borderColor: '#F59E0B',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 16,
+        gap: 6,
+    },
+    aiBannerTitle: {
+        fontWeight: '700',
+        color: '#92400E',
+        fontSize: 14,
+        marginBottom: 4,
+    },
+    aiIssue: {
+        color: '#B45309',
+        fontSize: 13,
+        lineHeight: 20,
+    },
+    aiSuggestTitle: {
+        fontWeight: '600',
+        color: '#065F46',
+        fontSize: 13,
+        marginTop: 8,
+    },
+    aiSuggest: {
+        color: '#047857',
+        fontSize: 13,
+        lineHeight: 20,
     },
 });
