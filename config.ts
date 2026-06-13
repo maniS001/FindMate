@@ -9,6 +9,12 @@ export const APP_CONFIG = {
     // Feature Flags
     FEATURES: {
         /**
+         * Captcha Verification
+         * Set to false to disable captcha verification step
+         */
+        CAPTCHA_ENABLED: false,
+
+        /**
          * Payment Gateway
          * Set to false to disable all payment-related UI and logic
          * Set to true to enable payment processing

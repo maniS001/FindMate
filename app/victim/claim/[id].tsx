@@ -9,6 +9,7 @@ import Card from '../../../components/Card';
 import CustomImagePicker from '../../../components/ImagePicker';
 import Input from '../../../components/Input';
 import PaymentModal from '../../../components/PaymentModal';
+import OtpModal from '../../../components/OtpModal';
 import { CONFIG } from '../../../constants/config';
 import { API_URL } from '../../../constants/api';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -45,13 +46,22 @@ export default function ClaimItem() {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [isPaid, setIsPaid] = useState(false);
 
-    const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+    const [isCaptchaVerified, setIsCaptchaVerified] = useState(!CONFIG.CAPTCHA_ENABLED);
     const [captchaLoading, setCaptchaLoading] = useState(false);
     const [captchaError, setCaptchaError] = useState('');
     const captchaRef = useRef<CaptchaRef>(null);
 
+    const [showOtpModal, setShowOtpModal] = useState(false);
     const [isOtpVerified, setIsOtpVerified] = useState(false);
     const [verifiedPhone, setVerifiedPhone] = useState('');
+
+    useEffect(() => {
+        // If captcha is disabled, but OTP is enabled, show OTP modal on mount (or when claim starts)
+        // Wait, the claim process doesn't start on mount! It starts when `isClaiming` is set to true!
+        if (isClaiming && !CONFIG.CAPTCHA_ENABLED && !isOtpVerified && CONFIG.SMS_OTP_ENABLED) {
+            setShowOtpModal(true);
+        }
+    }, [isClaiming]);
 
     const [isSemanticPhase, setIsSemanticPhase] = useState(false);
     const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
@@ -89,13 +99,23 @@ export default function ClaimItem() {
         const isCorrect = captchaRef.current.validate();
         if (isCorrect) {
             setIsCaptchaVerified(true);
-            setIsOtpVerified(true);
-            setVerifiedPhone('+15555555555');
+            if (CONFIG.SMS_OTP_ENABLED) {
+                setTimeout(() => setShowOtpModal(true), 300);
+            } else {
+                setIsOtpVerified(true);
+                setVerifiedPhone('+15555555555');
+            }
         } else {
             setCaptchaError('Incorrect answer. Please try again.');
             captchaRef.current?.refresh();
         }
         setCaptchaLoading(false);
+    };
+
+    const handleOtpVerified = () => {
+        setShowOtpModal(false);
+        setIsOtpVerified(true);
+        setVerifiedPhone('+15555555555');
     };
 
     const handleVerify = async () => {
@@ -318,6 +338,12 @@ export default function ClaimItem() {
                 visible={showPaymentModal}
                 onClose={() => setShowPaymentModal(false)}
                 onSuccess={handlePaymentSuccess}
+            />
+
+            <OtpModal
+                visible={showOtpModal}
+                onClose={() => setShowOtpModal(false)}
+                onVerified={handleOtpVerified}
             />
 
             <KeyboardAvoidingView

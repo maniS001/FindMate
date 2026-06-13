@@ -11,6 +11,9 @@ export const CONFIG = {
     // Push Notifications
     PUSH_NOTIFICATIONS_ENABLED: APP_CONFIG.FEATURES.PUSH_NOTIFICATIONS_ENABLED,
 
+    // Captcha Verification
+    CAPTCHA_ENABLED: APP_CONFIG.FEATURES.CAPTCHA_ENABLED,
+
     // SMS OTP
     SMS_OTP_ENABLED: APP_CONFIG.FEATURES.SMS_OTP_ENABLED,
     MERCHANT_VPA: 'merchant@upi', // Replace with real VPA in production
