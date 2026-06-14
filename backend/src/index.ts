@@ -288,6 +288,7 @@ app.post('/api/ai/validate-answers', async (req, res) => {
 
         const prompt = `You are a lost item claim verifier.
 Evaluate if the victim's answers logically prove they own the item, even if they aren't the exact words the founder used.
+
 Founder's hidden report context:
 Name: ${founderReportData?.name || ''}
 Description: ${founderReportData?.description || ''}
@@ -296,7 +297,12 @@ Questions and answers:
 ${qList}
 
 If the answers are completely wrong, respond with status "wrong".
-If the answers are logically correct or very close (semantic match), respond with status "semantic" AND generate 2 follow-up questions based on the founder's hidden context to double-check their identity. Make the questions specific enough that only the owner would know, but don't ask about things not mentioned in the context.
+If the answers are logically correct or very close (semantic match), respond with status "semantic" AND generate 2 follow-up questions. 
+CRITICAL RULES FOR FOLLOW-UP QUESTIONS:
+1. Do NOT ask questions where the answer is obvious from the Item's Name (e.g., if the name is "Physics Book Volume 1", do NOT ask "What is the subject?" or "What is the volume?").
+2. Ask about HIDDEN details from the description (e.g., color, scratches, specific contents).
+3. If the description is empty or lacks hidden details, ask questions only the true owner would know (e.g., "Are there any specific markings or names written on it?", "What specific brand or model is it?", "What was inside it?").
+4. Make the questions challenging to prevent fraud.
 
 Respond ONLY with this JSON:
 {
