@@ -640,6 +640,30 @@ app.patch('/api/notifications/:id/read', authenticateToken, async (req: any, res
     }
 });
 
+// Delete a single notification
+app.delete('/api/notifications/:id', authenticateToken, async (req: any, res) => {
+    try {
+        await prisma.notification.delete({
+            where: { id: req.params.id, userId: req.user.id }
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete notification' });
+    }
+});
+
+// Clear all notifications
+app.delete('/api/notifications', authenticateToken, async (req: any, res) => {
+    try {
+        await prisma.notification.deleteMany({
+            where: { userId: req.user.id }
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to clear notifications' });
+    }
+});
+
 // ============= Existing Endpoints (Updated with userId optional) =============
 
 // Create Item (Updated to link user)

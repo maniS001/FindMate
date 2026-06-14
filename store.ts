@@ -334,3 +334,42 @@ export const getNotifications = async (token: string): Promise<Notification[]> =
     }
 };
 
+export const markNotificationRead = async (id: string, token: string): Promise<boolean> => {
+    try {
+        const response = await fetch(`${API_URL}/notifications/${id}/read`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Error marking notification read:', error);
+        return false;
+    }
+};
+
+export const deleteNotification = async (id: string, token: string): Promise<boolean> => {
+    try {
+        const response = await fetch(`${API_URL}/notifications/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Error deleting notification:', error);
+        return false;
+    }
+};
+
+export const clearAllNotifications = async (token: string): Promise<boolean> => {
+    try {
+        const response = await fetch(`${API_URL}/notifications`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Error clearing notifications:', error);
+        return false;
+    }
+};
+

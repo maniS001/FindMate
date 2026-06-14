@@ -287,7 +287,7 @@ export default function ReportFoundItem() {
                         />
 
                         <Button
-                            title={aiLoading ? 'AI Checking...' : 'Report Item'}
+                            title={aiLoading ? 'Verifying with AI...' : 'Report Item'}
                             onPress={handleSubmit}
                             loading={loading || aiLoading}
                             style={{ marginTop: 8 }}

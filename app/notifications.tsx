@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell, RefreshCw } from 'lucide-react-native';
+import { ArrowLeft, Bell, RefreshCw, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { API_URL } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { showAlert } from '../utils/alert';
+import { clearAllNotifications, deleteNotification, markNotificationRead } from '../store';
 
 interface Notification {
     id: string;
@@ -40,13 +41,34 @@ export default function NotificationsScreen() {
             });
             if (response.ok) {
                 const data = await response.json();
+                data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                 setNotifications(data);
+
+                data.forEach((n: any) => {
+                    if (!n.read) {
+                        markNotificationRead(n.id, token || '');
+                    }
+                });
             }
         } catch (error) {
             console.error('Failed to fetch notifications', error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleClearAll = async () => {
+        if (!token) return;
+        setLoading(true);
+        await clearAllNotifications(token);
+        fetchNotifications();
+    };
+
+    const handleRemove = async (id: string) => {
+        if (!token) return;
+        setActionLoading(true);
+        await deleteNotification(id, token);
+        fetchNotifications();
     };
 
     const handleMarkResolved = (complaintId: string) => {
@@ -154,6 +176,9 @@ export default function NotificationsScreen() {
 
         return (
             <View style={[styles.notificationItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemove(item.id)}>
+                    <X size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
                 <View style={[styles.iconContainer, { backgroundColor: getIconColor() + '20' }]}>
                     <Bell size={20} color={getIconColor()} />
                 </View>
@@ -223,7 +248,9 @@ export default function NotificationsScreen() {
                     <ArrowLeft size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
-                <View style={{ width: 40 }} />
+                <TouchableOpacity onPress={handleClearAll} style={styles.clearAllButton}>
+                    <Text style={{ color: colors.primary, fontWeight: '600' }}>Clear All</Text>
+                </TouchableOpacity>
             </View>
 
             {loading ? (
@@ -371,5 +398,15 @@ const styles = StyleSheet.create({
     typeBadgeText: {
         fontSize: 10,
         fontWeight: '700',
+    },
+    removeBtn: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        padding: 4,
+        zIndex: 10,
+    },
+    clearAllButton: {
+        padding: 8,
     },
 });

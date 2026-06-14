@@ -216,7 +216,7 @@ export default function FileComplaint() {
                         )}
 
                         <Button
-                            title={aiLoading ? 'AI Checking...' : 'Submit Complaint'}
+                            title={aiLoading ? 'Verifying with AI...' : 'Submit Complaint'}
                             onPress={handleSubmit}
                             loading={loading || aiLoading}
                             style={{ marginTop: 24 }}

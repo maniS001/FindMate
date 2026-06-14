@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
@@ -20,7 +20,7 @@ export default function VerifyNotificationScreen() {
     const { colors } = useTheme();
 
     // State for Verification Flow
-    const [captchaVerified, setCaptchaVerified] = useState(false);
+    const [captchaVerified, setCaptchaVerified] = useState(!CONFIG.CAPTCHA_ENABLED);
     const [captchaLoading, setCaptchaLoading] = useState(false);
     const [captchaError, setCaptchaError] = useState('');
     const [showOtpModal, setShowOtpModal] = useState(false);
@@ -29,6 +29,13 @@ export default function VerifyNotificationScreen() {
     const [isPaid, setIsPaid] = useState(false);
 
     const captchaRef = useRef<CaptchaRef>(null);
+
+    useEffect(() => {
+        // If captcha is disabled, but OTP is enabled, show OTP modal on mount
+        if (!CONFIG.CAPTCHA_ENABLED && !isOtpVerified && CONFIG.SMS_OTP_ENABLED) {
+            setShowOtpModal(true);
+        }
+    }, []);
 
     // State for Security Questions
     const [loading, setLoading] = useState(false);

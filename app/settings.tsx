@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Moon, Sun } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight, FileText, HelpCircle, Moon, Shield, Sun, Trash2 } from 'lucide-react-native';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
@@ -50,14 +50,51 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* More Settings Coming Soon */}
+                {/* Account Settings */}
                 <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <Text style={[styles.cardTitle, { color: colors.text }]}>
-                        More Options
+                        About & Legal
                     </Text>
-                    <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
-                        Additional settings coming soon...
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <View style={styles.menuLeft}>
+                            <Shield size={20} color={colors.textSecondary} />
+                            <Text style={[styles.menuLabel, { color: colors.text }]}>Privacy Policy</Text>
+                        </View>
+                        <ChevronRight size={20} color={colors.border} />
+                    </TouchableOpacity>
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <View style={styles.menuLeft}>
+                            <FileText size={20} color={colors.textSecondary} />
+                            <Text style={[styles.menuLabel, { color: colors.text }]}>Terms of Service</Text>
+                        </View>
+                        <ChevronRight size={20} color={colors.border} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Support & Danger Zone */}
+                <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>
+                        Support & Security
                     </Text>
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <View style={styles.menuLeft}>
+                            <HelpCircle size={20} color={colors.textSecondary} />
+                            <Text style={[styles.menuLabel, { color: colors.text }]}>Help & Support</Text>
+                        </View>
+                        <ChevronRight size={20} color={colors.border} />
+                    </TouchableOpacity>
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <View style={styles.menuLeft}>
+                            <Trash2 size={20} color="#EF4444" />
+                            <Text style={[styles.menuLabel, { color: "#EF4444" }]}>Delete Account</Text>
+                        </View>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -115,11 +152,29 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     settingDescription: {
-        fontSize: 13,
-        marginTop: 2,
+        fontSize: 14,
+        marginTop: 4,
     },
     placeholderText: {
         fontSize: 14,
         fontStyle: 'italic',
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+    },
+    menuLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    menuLabel: {
+        fontSize: 16,
+    },
+    divider: {
+        height: 1,
+        marginVertical: 4,
     },
 });
