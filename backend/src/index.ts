@@ -1546,6 +1546,125 @@ app.post('/api/communities/:id/members', authenticateToken, async (req: any, res
     }
 });
 
+// Join Community Request
+app.post('/api/communities/:id/join-request', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { id } = req.params;
+        const comm = await prisma.community.findUnique({ where: { id } });
+        if (!comm) return res.status(404).json({ error: 'Community not found' });
+
+        const existing = await prisma.communityMember.findFirst({
+            where: { communityId: id, userId: req.user.id }
+        });
+        if (existing) return res.status(400).json({ error: 'Already a member or request pending' });
+
+        const member = await prisma.communityMember.create({
+            data: { communityId: id, userId: req.user.id, role: 'PENDING' }
+        });
+
+        // Notify the community admin
+        const admin = await prisma.communityMember.findFirst({
+            where: { communityId: id, role: 'ADMIN' },
+            include: { user: true }
+        });
+        if (admin?.user) {
+            await prisma.notification.create({
+                data: {
+                    userId: admin.user.id,
+                    title: 'New Join Request',
+                    message: `${req.user.name || req.user.email} wants to join your community "${comm.name}"`,
+                    type: 'AREA_ALERT',
+                    payload: JSON.stringify({ communityId: id, requestUserId: req.user.id })
+                }
+            });
+        }
+        res.json({ message: 'Join request sent', member });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Accept/Reject Join Request
+app.patch('/api/communities/:id/members/:userId', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { id, userId } = req.params;
+        const { action } = req.body; // 'ACCEPT' or 'REJECT'
+
+        // Check requester is admin
+        const isAdmin = await prisma.communityMember.findFirst({
+            where: { communityId: id, userId: req.user.id, role: 'ADMIN' }
+        });
+        if (!isAdmin) return res.status(403).json({ error: 'Only admins can approve requests' });
+
+        if (action === 'ACCEPT') {
+            await prisma.communityMember.updateMany({
+                where: { communityId: id, userId },
+                data: { role: 'MEMBER' }
+            });
+            res.json({ message: 'Member accepted' });
+        } else {
+            await prisma.communityMember.deleteMany({
+                where: { communityId: id, userId }
+            });
+            res.json({ message: 'Request rejected' });
+        }
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Search Communities (public, for join)
+app.get('/api/communities/search', async (req: any, res: any) => {
+    try {
+        const { q } = req.query;
+        const comms = await prisma.community.findMany({
+            where: q ? { name: { contains: String(q), mode: 'insensitive' } } : {},
+            include: { members: true, organization: true },
+            take: 20
+        });
+        res.json(comms);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Add Community to Organization
+app.patch('/api/orgs/:orgId/communities/:commId', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { orgId, commId } = req.params;
+        // Check requester is org admin
+        const isAdmin = await prisma.organizationAdmin.findFirst({
+            where: { organizationId: orgId, userId: req.user.id }
+        });
+        if (!isAdmin) return res.status(403).json({ error: 'Only org admins can add communities' });
+
+        const comm = await prisma.community.update({
+            where: { id: commId },
+            data: { organizationId: orgId }
+        });
+        res.json(comm);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get pending join requests for communities I admin
+app.get('/api/users/me/pending-requests', authenticateToken, async (req: any, res: any) => {
+    try {
+        const adminOf = await prisma.communityMember.findMany({
+            where: { userId: req.user.id, role: 'ADMIN' }
+        });
+        const communityIds = adminOf.map((m: any) => m.communityId);
+        const pending = await prisma.communityMember.findMany({
+            where: { communityId: { in: communityIds }, role: 'PENDING' },
+            include: { user: { select: { id: true, name: true, email: true } }, community: true }
+        });
+        res.json(pending);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Start server after all routes are registered
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);

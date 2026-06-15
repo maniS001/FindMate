@@ -23,35 +23,18 @@ export default function FileComplaint() {
     const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
     const [aiFeedback, setAiFeedback] = useState<{ issues: string[]; suggestions: string[] } | null>(null);
 
+    // Community/Org data
     const [comms, setComms] = useState<any[]>([]);
     const [orgs, setOrgs] = useState<any[]>([]);
+
+    // Notification target state
     const [notificationType, setNotificationType] = useState<'RADIUS' | 'COMMUNITY' | 'ORGANIZATION'>('RADIUS');
     const [notifyRadius, setNotifyRadius] = useState('1');
-    const [targetCommunityId, setTargetCommunityId] = useState('');
-    const [targetOrganizationId, setTargetOrganizationId] = useState('');
+    const [selectedCommunity, setSelectedCommunity] = useState<any | null>(null);
+    const [selectedOrg, setSelectedOrg] = useState<any | null>(null);
+
+    // Cash prize
     const [cashPrize, setCashPrize] = useState('');
-
-    useEffect(() => {
-        if (token) {
-            fetch(`${API_URL}/users/me/communities`, { headers: { Authorization: `Bearer ${token}` }})
-                .then(async r => {
-                    if (!r.ok) throw new Error('Failed to fetch communities');
-                    const text = await r.text();
-                    try { return JSON.parse(text); } catch (e) { throw new Error('Invalid JSON'); }
-                })
-                .then(setComms)
-                .catch(e => console.log('Communities fetch error:', e.message));
-
-            fetch(`${API_URL}/users/me/orgs`, { headers: { Authorization: `Bearer ${token}` }})
-                .then(async r => {
-                    if (!r.ok) throw new Error('Failed to fetch orgs');
-                    const text = await r.text();
-                    try { return JSON.parse(text); } catch (e) { throw new Error('Invalid JSON'); }
-                })
-                .then(setOrgs)
-                .catch(e => console.log('Orgs fetch error:', e.message));
-        }
-    }, [token]);
 
     const [form, setForm] = useState({
         name: '',
@@ -63,6 +46,19 @@ export default function FileComplaint() {
     });
     const [date, setDate] = useState(new Date());
 
+    useEffect(() => {
+        if (token) {
+            fetch(`${API_URL}/users/me/communities`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(async r => { if (!r.ok) throw new Error(); const t = await r.text(); return JSON.parse(t); })
+                .then(d => setComms(Array.isArray(d) ? d : []))
+                .catch(() => {});
+            fetch(`${API_URL}/users/me/orgs`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(async r => { if (!r.ok) throw new Error(); const t = await r.text(); return JSON.parse(t); })
+                .then(d => setOrgs(Array.isArray(d) ? d : []))
+                .catch(() => {});
+        }
+    }, [token]);
+
     const handleAutoGenerate = async () => {
         if (!form.name || !form.category || !form.location) {
             showAlert('Missing Information', 'Please fill Item Name, Category, and Location first.');
@@ -73,18 +69,15 @@ export default function FileComplaint() {
             const res = await fetch(`${API_URL}/ai/generate-description`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    name: form.name, category: form.category, 
+                body: JSON.stringify({
+                    name: form.name, category: form.category,
                     location: form.location, date: date.toISOString().split('T')[0],
                     role: 'victim'
                 }),
             });
             const data = await res.json();
-            if (data.error) {
-                showAlert('AI Error', data.error);
-            } else if (data.description) {
-                setForm(prev => ({ ...prev, description: data.description }));
-            }
+            if (data.error) { showAlert('AI Error', data.error); }
+            else if (data.description) { setForm(prev => ({ ...prev, description: data.description })); }
         } catch {
             showAlert('Error', 'Failed to auto-generate description. Check network.');
         } finally {
@@ -95,6 +88,14 @@ export default function FileComplaint() {
     const handleSubmit = async () => {
         if (!form.name || !form.category || !form.location || !form.contactInfo) {
             showAlert('Missing Information', 'Please fill in all required fields.');
+            return;
+        }
+        if (notificationType === 'COMMUNITY' && !selectedCommunity) {
+            showAlert('Select Community', 'Please select a community to notify.');
+            return;
+        }
+        if (notificationType === 'ORGANIZATION' && !selectedOrg) {
+            showAlert('Select Organization', 'Please select an organization to notify.');
             return;
         }
 
@@ -119,18 +120,17 @@ export default function FileComplaint() {
                 return;
             }
             if (!aiData.valid) {
-                setAiFeedback({ 
-                    issues: aiData.issues?.length ? aiData.issues : [aiData.reason || 'Invalid data according to AI.'], 
-                    suggestions: aiData.suggestions || [] 
+                setAiFeedback({
+                    issues: aiData.issues?.length ? aiData.issues : [aiData.reason || 'Invalid data.'],
+                    suggestions: aiData.suggestions || []
                 });
                 setAiLoading(false);
-                return; // Block submission
+                return;
             }
         } catch {
             // AI unavailable — allow submission
         }
         setAiLoading(false);
-        // --- End AI Validation ---
 
         setLoading(true);
         try {
@@ -156,17 +156,15 @@ export default function FileComplaint() {
                 contactInfo: form.contactInfo,
                 imageUris: base64Images,
                 userId: user?.id,
-                cashPrize: cashPrize || undefined,
-                notifyRadius: notificationType === 'RADIUS' ? parseInt(notifyRadius) || 1 : undefined,
-                targetCommunityId: notificationType === 'COMMUNITY' ? targetCommunityId || undefined : undefined,
-                targetOrganizationId: notificationType === 'ORGANIZATION' ? targetOrganizationId || undefined : undefined,
-                latitude: loc ? loc.coords.latitude : undefined,
-                longitude: loc ? loc.coords.longitude : undefined,
+                cashPrize: cashPrize.trim() || undefined,
+                notifyRadius: notificationType === 'RADIUS' ? Math.min(Math.max(parseInt(notifyRadius) || 1, 1), 10) : undefined,
+                targetCommunityId: notificationType === 'COMMUNITY' ? selectedCommunity?.id : undefined,
+                targetOrganizationId: notificationType === 'ORGANIZATION' ? selectedOrg?.id : undefined,
+                latitude: loc?.coords.latitude,
+                longitude: loc?.coords.longitude,
             });
-            router.push({
-                pathname: '/success',
-                params: { type: 'complaint' }
-            });
+
+            router.push({ pathname: '/success', params: { type: 'complaint' } });
         } catch (error) {
             console.error('Submit error:', error);
             showAlert('Error', 'Failed to file complaint. Please try again.');
@@ -177,18 +175,11 @@ export default function FileComplaint() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={{ flex: 1 }}
-                keyboardVerticalOffset={0}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.content}
-                    keyboardShouldPersistTaps="handled"
-                >
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={0}>
+                <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
                     <Text style={[styles.heading, { color: colors.text }]}>File a Complaint</Text>
                     <Text style={[styles.subHeader, { color: colors.textSecondary }]}>
-                        Didn't find your item? File a complaint and we'll notify you if someone reports finding it.
+                        Didn't find your item? File a complaint and we'll notify people nearby to help.
                     </Text>
 
                     <View style={styles.form}>
@@ -198,7 +189,6 @@ export default function FileComplaint() {
                             value={form.name}
                             onChangeText={(text) => setForm({ ...form, name: text })}
                         />
-
 
                         <CategoryPicker
                             label="Category *"
@@ -221,7 +211,11 @@ export default function FileComplaint() {
 
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
                             <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, flex: 1 }}>Description</Text>
-                            <TouchableOpacity onPress={handleAutoGenerate} disabled={isGeneratingDesc} style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <TouchableOpacity
+                                onPress={handleAutoGenerate}
+                                disabled={isGeneratingDesc}
+                                style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                            >
                                 {isGeneratingDesc ? <ActivityIndicator size="small" color={colors.primary} /> : null}
                                 <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
                                     {isGeneratingDesc ? 'Generating...' : '✨ Auto-Generate'}
@@ -250,63 +244,141 @@ export default function FileComplaint() {
                             initialImages={form.imageUris}
                         />
 
-                        <Input
-                            label="Cash Prize Announcement (Optional)"
-                            placeholder="e.g. 500 INR, Reward Gift"
-                            value={cashPrize}
-                            onChangeText={setCashPrize}
-                        />
-
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, marginTop: 16 }}>Notification Target</Text>
-                        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                            <TouchableOpacity onPress={() => setNotificationType('RADIUS')} style={{ padding: 8, borderWidth: 1, borderColor: notificationType === 'RADIUS' ? colors.primary : colors.border, borderRadius: 8, backgroundColor: notificationType === 'RADIUS' ? colors.primary + '10' : 'transparent' }}>
-                                <Text style={{ color: colors.text }}>Radius</Text>
-                            </TouchableOpacity>
-                            {comms.length > 0 && (
-                                <TouchableOpacity onPress={() => setNotificationType('COMMUNITY')} style={{ padding: 8, borderWidth: 1, borderColor: notificationType === 'COMMUNITY' ? colors.primary : colors.border, borderRadius: 8, backgroundColor: notificationType === 'COMMUNITY' ? colors.primary + '10' : 'transparent' }}>
-                                    <Text style={{ color: colors.text }}>Community</Text>
-                                </TouchableOpacity>
-                            )}
-                            {orgs.length > 0 && (
-                                <TouchableOpacity onPress={() => setNotificationType('ORGANIZATION')} style={{ padding: 8, borderWidth: 1, borderColor: notificationType === 'ORGANIZATION' ? colors.primary : colors.border, borderRadius: 8, backgroundColor: notificationType === 'ORGANIZATION' ? colors.primary + '10' : 'transparent' }}>
-                                    <Text style={{ color: colors.text }}>Organization</Text>
-                                </TouchableOpacity>
+                        {/* Cash Prize Section */}
+                        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={{ fontSize: 18 }}>💰</Text>
+                                <View style={{ marginLeft: 10, flex: 1 }}>
+                                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Cash Prize (Optional)</Text>
+                                    <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
+                                        Announce a reward to encourage finders to return your item
+                                    </Text>
+                                </View>
+                            </View>
+                            <Input
+                                placeholder="e.g. ₹500, ₹1000 reward..."
+                                value={cashPrize}
+                                onChangeText={setCashPrize}
+                            />
+                            {cashPrize.trim() !== '' && (
+                                <View style={[styles.previewBadge, { backgroundColor: '#16a34a15', borderColor: '#16a34a' }]}>
+                                    <Text style={{ fontSize: 14 }}>💰</Text>
+                                    <Text style={{ color: '#16a34a', fontWeight: '700', marginLeft: 6, fontSize: 13 }}>
+                                        Reward shown on item card: {cashPrize}
+                                    </Text>
+                                </View>
                             )}
                         </View>
 
-                        {notificationType === 'RADIUS' && (
-                            <Input
-                                label="Radius (km)"
-                                placeholder="1 to 10"
-                                value={notifyRadius}
-                                onChangeText={setNotifyRadius}
-                                keyboardType="number-pad"
-                            />
-                        )}
-
-                        {notificationType === 'COMMUNITY' && (
-                            <View style={{ marginTop: 8 }}>
-                                <Text style={{ color: colors.textSecondary, marginBottom: 4 }}>Select Community ID (or name exactly):</Text>
-                                <Input
-                                    placeholder="Enter Community ID"
-                                    value={targetCommunityId}
-                                    onChangeText={setTargetCommunityId}
-                                />
-                                {comms.map(c => <Text key={c.id} style={{color: colors.primary, fontSize: 12}} onPress={() => setTargetCommunityId(c.id)}>{c.name} (Tap to select)</Text>)}
+                        {/* Notification Target Section */}
+                        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={{ fontSize: 18 }}>📢</Text>
+                                <View style={{ marginLeft: 10, flex: 1 }}>
+                                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Who to Notify</Text>
+                                    <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
+                                        Choose who gets a notification about your lost item
+                                    </Text>
+                                </View>
                             </View>
-                        )}
 
-                        {notificationType === 'ORGANIZATION' && (
-                            <View style={{ marginTop: 8 }}>
-                                <Text style={{ color: colors.textSecondary, marginBottom: 4 }}>Select Organization ID:</Text>
-                                <Input
-                                    placeholder="Enter Org ID"
-                                    value={targetOrganizationId}
-                                    onChangeText={setTargetOrganizationId}
-                                />
-                                {orgs.map(o => <Text key={o.id} style={{color: colors.primary, fontSize: 12}} onPress={() => setTargetOrganizationId(o.id)}>{o.name} (Tap to select)</Text>)}
+                            {/* Type Selector */}
+                            <View style={styles.notifyTypeRow}>
+                                <TouchableOpacity
+                                    style={[styles.notifyTypeBtn, { borderColor: notificationType === 'RADIUS' ? colors.primary : colors.border, backgroundColor: notificationType === 'RADIUS' ? colors.primary + '15' : 'transparent' }]}
+                                    onPress={() => setNotificationType('RADIUS')}
+                                >
+                                    <Text style={{ fontSize: 18 }}>📍</Text>
+                                    <Text style={[styles.notifyTypeTxt, { color: notificationType === 'RADIUS' ? colors.primary : colors.text }]}>Nearby</Text>
+                                </TouchableOpacity>
+
+                                {comms.length > 0 && (
+                                    <TouchableOpacity
+                                        style={[styles.notifyTypeBtn, { borderColor: notificationType === 'COMMUNITY' ? colors.primary : colors.border, backgroundColor: notificationType === 'COMMUNITY' ? colors.primary + '15' : 'transparent' }]}
+                                        onPress={() => setNotificationType('COMMUNITY')}
+                                    >
+                                        <Text style={{ fontSize: 18 }}>👥</Text>
+                                        <Text style={[styles.notifyTypeTxt, { color: notificationType === 'COMMUNITY' ? colors.primary : colors.text }]}>Community</Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {orgs.length > 0 && (
+                                    <TouchableOpacity
+                                        style={[styles.notifyTypeBtn, { borderColor: notificationType === 'ORGANIZATION' ? colors.primary : colors.border, backgroundColor: notificationType === 'ORGANIZATION' ? colors.primary + '15' : 'transparent' }]}
+                                        onPress={() => setNotificationType('ORGANIZATION')}
+                                    >
+                                        <Text style={{ fontSize: 18 }}>🏢</Text>
+                                        <Text style={[styles.notifyTypeTxt, { color: notificationType === 'ORGANIZATION' ? colors.primary : colors.text }]}>Organization</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
-                        )}
+
+                            {/* Radius Selector */}
+                            {notificationType === 'RADIUS' && (
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>
+                                        Notify people within this radius of your current GPS location:
+                                    </Text>
+                                    <View style={styles.radiusRow}>
+                                        {['1', '2', '5', '10'].map(r => (
+                                            <TouchableOpacity
+                                                key={r}
+                                                style={[styles.radiusChip, { borderColor: notifyRadius === r ? colors.primary : colors.border, backgroundColor: notifyRadius === r ? colors.primary : 'transparent' }]}
+                                                onPress={() => setNotifyRadius(r)}
+                                            >
+                                                <Text style={{ color: notifyRadius === r ? 'white' : colors.text, fontWeight: '600', fontSize: 13 }}>{r} km</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Community Selector */}
+                            {notificationType === 'COMMUNITY' && (
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>
+                                        Notify members of this community:
+                                    </Text>
+                                    {comms.map(c => (
+                                        <TouchableOpacity
+                                            key={c.id}
+                                            style={[styles.selectItem, {
+                                                borderColor: selectedCommunity?.id === c.id ? colors.primary : colors.border,
+                                                backgroundColor: selectedCommunity?.id === c.id ? colors.primary + '15' : colors.background
+                                            }]}
+                                            onPress={() => setSelectedCommunity(c)}
+                                        >
+                                            <Text style={{ fontSize: 14 }}>👥</Text>
+                                            <Text style={[styles.selectItemText, { color: selectedCommunity?.id === c.id ? colors.primary : colors.text }]}>{c.name}</Text>
+                                            {selectedCommunity?.id === c.id && <Text style={{ color: colors.primary }}>✓</Text>}
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Organization Selector */}
+                            {notificationType === 'ORGANIZATION' && (
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>
+                                        Notify all members in this organization:
+                                    </Text>
+                                    {orgs.map(o => (
+                                        <TouchableOpacity
+                                            key={o.id}
+                                            style={[styles.selectItem, {
+                                                borderColor: selectedOrg?.id === o.id ? colors.primary : colors.border,
+                                                backgroundColor: selectedOrg?.id === o.id ? colors.primary + '15' : colors.background
+                                            }]}
+                                            onPress={() => setSelectedOrg(o)}
+                                        >
+                                            <Text style={{ fontSize: 14 }}>🏢</Text>
+                                            <Text style={[styles.selectItemText, { color: selectedOrg?.id === o.id ? colors.primary : colors.text }]}>{o.name}</Text>
+                                            {selectedOrg?.id === o.id && <Text style={{ color: colors.primary }}>✓</Text>}
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
 
                         {/* AI Feedback Banner */}
                         {aiFeedback && (
@@ -340,25 +412,56 @@ export default function FileComplaint() {
 }
 
 const styles = StyleSheet.create({
-    container: {
+    container: { flex: 1 },
+    content: { padding: 24 },
+    heading: { fontSize: 28, fontWeight: '700', marginBottom: 8 },
+    subHeader: { fontSize: 16, marginBottom: 32, lineHeight: 24 },
+    form: { gap: 8 },
+    sectionCard: {
+        padding: 16,
+        borderRadius: 14,
+        borderWidth: 1,
+        marginTop: 8,
+        gap: 10,
+    },
+    sectionHeader: { flexDirection: 'row', alignItems: 'flex-start' },
+    sectionTitle: { fontSize: 15, fontWeight: '700' },
+    sectionDesc: { fontSize: 12, marginTop: 2, lineHeight: 16 },
+    previewBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    notifyTypeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+    notifyTypeBtn: {
         flex: 1,
+        minWidth: 80,
+        alignItems: 'center',
+        padding: 10,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        gap: 4,
     },
-    content: {
-        padding: 24,
+    notifyTypeTxt: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
+    radiusRow: { flexDirection: 'row', gap: 8 },
+    radiusChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1.5,
     },
-    heading: {
-        fontSize: 28,
-        fontWeight: '700',
+    selectItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1.5,
         marginBottom: 8,
+        gap: 10,
     },
-    subHeader: {
-        fontSize: 16,
-        marginBottom: 32,
-        lineHeight: 24,
-    },
-    form: {
-        gap: 8,
-    },
+    selectItemText: { flex: 1, fontSize: 14, fontWeight: '500' },
     aiBanner: {
         backgroundColor: '#FFF3CD',
         borderColor: '#F59E0B',
@@ -368,26 +471,8 @@ const styles = StyleSheet.create({
         marginTop: 16,
         gap: 6,
     },
-    aiBannerTitle: {
-        fontWeight: '700',
-        color: '#92400E',
-        fontSize: 14,
-        marginBottom: 4,
-    },
-    aiIssue: {
-        color: '#B45309',
-        fontSize: 13,
-        lineHeight: 20,
-    },
-    aiSuggestTitle: {
-        fontWeight: '600',
-        color: '#065F46',
-        fontSize: 13,
-        marginTop: 8,
-    },
-    aiSuggest: {
-        color: '#047857',
-        fontSize: 13,
-        lineHeight: 20,
-    },
+    aiBannerTitle: { fontWeight: '700', color: '#92400E', fontSize: 14, marginBottom: 4 },
+    aiIssue: { color: '#B45309', fontSize: 13, lineHeight: 20 },
+    aiSuggestTitle: { fontWeight: '600', color: '#065F46', fontSize: 13, marginTop: 8 },
+    aiSuggest: { color: '#047857', fontSize: 13, lineHeight: 20 },
 });

@@ -250,9 +250,13 @@ export const getComplaints = async (): Promise<Complaint[]> => {
     }
 };
 
-export const searchComplaints = async (query: string): Promise<Complaint[]> => {
+export const searchComplaints = async (query: string, communityId?: string, orgId?: string): Promise<Complaint[]> => {
     try {
-        const response = await fetch(`${API_URL}/complaints?query=${encodeURIComponent(query)}`);
+        const params = new URLSearchParams();
+        if (query) params.append('query', query);
+        if (communityId) params.append('communityId', communityId);
+        if (orgId) params.append('orgId', orgId);
+        const response = await fetch(`${API_URL}/complaints?${params.toString()}`);
         if (!response.ok) throw new Error('Failed to search complaints');
         return await response.json();
     } catch (error) {

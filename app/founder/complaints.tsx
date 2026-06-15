@@ -1,24 +1,52 @@
 import { useRouter } from 'expo-router';
-import { Calendar, MapPin, Search } from 'lucide-react-native';
+import { Calendar, MapPin, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../../components/Card';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { API_URL } from '../../constants/api';
 import { Complaint, getComplaints, searchComplaints } from '../../store';
 
 export default function ViewComplaints() {
     const router = useRouter();
     const { colors } = useTheme();
+    const { token } = useAuth();
     const { width } = useWindowDimensions();
     const numColumns = width >= 600 ? 2 : 1;
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
+    // Filter state
+    const [showFilters, setShowFilters] = useState(false);
+    const [filterType, setFilterType] = useState<'RADIUS' | 'COMMUNITY' | 'ORGANIZATION'>('RADIUS');
+    const [filterRadius, setFilterRadius] = useState('1');
+    const [selectedCommunity, setSelectedCommunity] = useState<any | null>(null);
+    const [selectedOrg, setSelectedOrg] = useState<any | null>(null);
+    const [comms, setComms] = useState<any[]>([]);
+    const [orgs, setOrgs] = useState<any[]>([]);
+
     useEffect(() => {
         loadComplaints();
+        if (token) {
+            fetch(`${API_URL}/users/me/communities`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(async r => { if (!r.ok) throw new Error(); return r.json(); })
+                .then(d => setComms(Array.isArray(d) ? d : []))
+                .catch(() => {});
+            fetch(`${API_URL}/users/me/orgs`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(async r => { if (!r.ok) throw new Error(); return r.json(); })
+                .then(d => setOrgs(Array.isArray(d) ? d : []))
+                .catch(() => {});
+        }
     }, []);
+
+    const activeFilterLabel = () => {
+        if (filterType === 'COMMUNITY' && selectedCommunity) return `👥 ${selectedCommunity.name}`;
+        if (filterType === 'ORGANIZATION' && selectedOrg) return `🏢 ${selectedOrg.name}`;
+        return `📍 ${filterRadius} km radius`;
+    };
 
     const loadComplaints = async () => {
         setLoading(true);
@@ -31,14 +59,17 @@ export default function ViewComplaints() {
     };
 
     const handleSearch = async () => {
-        if (!searchQuery.trim()) {
-            loadComplaints();
-            return;
-        }
-
         setLoading(true);
         try {
-            const results = await searchComplaints(searchQuery);
+            if (!searchQuery.trim() && filterType === 'RADIUS') {
+                loadComplaints();
+                return;
+            }
+            const results = await searchComplaints(
+                searchQuery,
+                filterType === 'COMMUNITY' ? selectedCommunity?.id : undefined,
+                filterType === 'ORGANIZATION' ? selectedOrg?.id : undefined,
+            );
             setComplaints(results);
         } finally {
             setLoading(false);
@@ -139,31 +170,123 @@ export default function ViewComplaints() {
                 <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
                     <View style={styles.searchRow}>
                         <TextInput
-                            style={[
-                                styles.searchInput,
-                                {
-                                    backgroundColor: colors.background,
-                                    borderColor: colors.border,
-                                    color: colors.text
-                                }
-                            ]}
+                            style={[styles.searchInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                             placeholder="Search by name, location, or category..."
                             placeholderTextColor={colors.textSecondary}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                             onSubmitEditing={handleSearch}
                         />
-                        <TouchableOpacity
-                            onPress={handleSearch}
-                            style={[styles.searchButton, { backgroundColor: colors.primary }]}
-                            activeOpacity={0.7}
-                        >
+                        <TouchableOpacity onPress={handleSearch} style={[styles.searchButton, { backgroundColor: colors.primary }]} activeOpacity={0.7}>
                             <Search size={20} color="#FFFFFF" />
                         </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setShowFilters(!showFilters)}
+                            style={[styles.searchButton, { backgroundColor: showFilters ? colors.primary : colors.surface, borderWidth: 1, borderColor: colors.border }]}
+                        >
+                            <SlidersHorizontal size={20} color={showFilters ? '#fff' : colors.text} />
+                        </TouchableOpacity>
                     </View>
-                    <Text style={[styles.searchHint, { color: colors.textSecondary }]}>
-                        Find complaints matching the item you found
-                    </Text>
+
+                    {/* Active Filter Pill */}
+                    <View style={styles.filterPillRow}>
+                        <View style={[styles.filterPill, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+                            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>{activeFilterLabel()}</Text>
+                        </View>
+                        <Text style={[styles.searchHint, { color: colors.textSecondary }]}>Find complaints matching the item you found</Text>
+                    </View>
+
+                    {/* Expanded Filter Panel */}
+                    {showFilters && (
+                        <View style={[styles.filterPanel, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                            <Text style={[styles.filterTitle, { color: colors.text }]}>Search Scope</Text>
+                            <View style={styles.filterTypeRow}>
+                                <TouchableOpacity
+                                    style={[styles.filterTypeBtn, { borderColor: filterType === 'RADIUS' ? colors.primary : colors.border, backgroundColor: filterType === 'RADIUS' ? colors.primary + '15' : 'transparent' }]}
+                                    onPress={() => setFilterType('RADIUS')}
+                                >
+                                    <Text style={{ fontSize: 16 }}>📍</Text>
+                                    <Text style={[styles.filterTypeTxt, { color: filterType === 'RADIUS' ? colors.primary : colors.text }]}>Radius</Text>
+                                </TouchableOpacity>
+
+                                {comms.length > 0 && (
+                                    <TouchableOpacity
+                                        style={[styles.filterTypeBtn, { borderColor: filterType === 'COMMUNITY' ? colors.primary : colors.border, backgroundColor: filterType === 'COMMUNITY' ? colors.primary + '15' : 'transparent' }]}
+                                        onPress={() => setFilterType('COMMUNITY')}
+                                    >
+                                        <Text style={{ fontSize: 16 }}>👥</Text>
+                                        <Text style={[styles.filterTypeTxt, { color: filterType === 'COMMUNITY' ? colors.primary : colors.text }]}>Community</Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {orgs.length > 0 && (
+                                    <TouchableOpacity
+                                        style={[styles.filterTypeBtn, { borderColor: filterType === 'ORGANIZATION' ? colors.primary : colors.border, backgroundColor: filterType === 'ORGANIZATION' ? colors.primary + '15' : 'transparent' }]}
+                                        onPress={() => setFilterType('ORGANIZATION')}
+                                    >
+                                        <Text style={{ fontSize: 16 }}>🏢</Text>
+                                        <Text style={[styles.filterTypeTxt, { color: filterType === 'ORGANIZATION' ? colors.primary : colors.text }]}>Organization</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            {filterType === 'RADIUS' && (
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 6 }}>Radius around current location:</Text>
+                                    <View style={styles.radiusRow}>
+                                        {['1', '2', '5', '10'].map(r => (
+                                            <TouchableOpacity
+                                                key={r}
+                                                style={[styles.radiusChip, { borderColor: filterRadius === r ? colors.primary : colors.border, backgroundColor: filterRadius === r ? colors.primary : 'transparent' }]}
+                                                onPress={() => setFilterRadius(r)}
+                                            >
+                                                <Text style={{ color: filterRadius === r ? 'white' : colors.text, fontWeight: '600', fontSize: 13 }}>{r} km</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+
+                            {filterType === 'COMMUNITY' && (
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 6 }}>Select community:</Text>
+                                    {comms.map(c => (
+                                        <TouchableOpacity
+                                            key={c.id}
+                                            style={[styles.selectItem, { borderColor: selectedCommunity?.id === c.id ? colors.primary : colors.border, backgroundColor: selectedCommunity?.id === c.id ? colors.primary + '15' : colors.surface }]}
+                                            onPress={() => setSelectedCommunity(c)}
+                                        >
+                                            <Text style={[styles.selectItemText, { color: selectedCommunity?.id === c.id ? colors.primary : colors.text }]}>{c.name}</Text>
+                                            {selectedCommunity?.id === c.id && <Text style={{ color: colors.primary }}>✓</Text>}
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+
+                            {filterType === 'ORGANIZATION' && (
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 6 }}>Select organization:</Text>
+                                    {orgs.map(o => (
+                                        <TouchableOpacity
+                                            key={o.id}
+                                            style={[styles.selectItem, { borderColor: selectedOrg?.id === o.id ? colors.primary : colors.border, backgroundColor: selectedOrg?.id === o.id ? colors.primary + '15' : colors.surface }]}
+                                            onPress={() => setSelectedOrg(o)}
+                                        >
+                                            <Text style={[styles.selectItemText, { color: selectedOrg?.id === o.id ? colors.primary : colors.text }]}>{o.name}</Text>
+                                            {selectedOrg?.id === o.id && <Text style={{ color: colors.primary }}>✓</Text>}
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+
+                            <TouchableOpacity
+                                style={[styles.applyBtn, { backgroundColor: colors.primary }]}
+                                onPress={() => { setShowFilters(false); handleSearch(); }}
+                            >
+                                <Text style={{ color: 'white', fontWeight: '700', fontSize: 14 }}>Apply Filter & Search</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
 
                 {loading ? (
@@ -256,6 +379,60 @@ const styles = StyleSheet.create({
     searchHint: {
         fontSize: 13,
         lineHeight: 18,
+        flex: 1,
+    },
+    filterPillRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
+    },
+    filterPill: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+        borderWidth: 1,
+    },
+    filterPanel: {
+        marginTop: 10,
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        gap: 8,
+    },
+    filterTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+    filterTypeRow: { flexDirection: 'row', gap: 8 },
+    filterTypeBtn: {
+        flex: 1,
+        alignItems: 'center',
+        padding: 10,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        gap: 4,
+    },
+    filterTypeTxt: { fontSize: 12, fontWeight: '600' },
+    radiusRow: { flexDirection: 'row', gap: 8 },
+    radiusChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1.5,
+    },
+    selectItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        marginBottom: 6,
+        gap: 10,
+    },
+    selectItemText: { flex: 1, fontSize: 14, fontWeight: '500' },
+    applyBtn: {
+        marginTop: 8,
+        padding: 12,
+        borderRadius: 10,
+        alignItems: 'center',
     },
     list: {
         padding: 16,
