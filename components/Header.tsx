@@ -59,7 +59,7 @@ export default function Header() {
         }
     };
 
-    const hideHeaderRoutes = ['/auth/signup', '/account', '/settings', '/about', '/notifications'];
+    const hideHeaderRoutes = ['/auth/signup', '/account', '/settings', '/about', '/notifications', '/success'];
     if (hideHeaderRoutes.includes(pathname)) return null;
 
     return (

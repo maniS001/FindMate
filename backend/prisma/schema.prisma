@@ -21,9 +21,15 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
-  items       Item[]
-  complaints  Complaint[]
-  notifications Notification[]
+  items           Item[]
+  complaints      Complaint[]
+  notifications   Notification[]
+  
+  // Organization & Community relations
+  ownedOrgs       Organization[] @relation("OrgCreator")
+  orgAdmins       OrganizationAdmin[]
+  ownedCommunities Community[] @relation("CommunityCreator")
+  memberships     CommunityMember[]
 }
 
 model Item {
@@ -44,6 +50,13 @@ model Item {
   reopenReason    String?
   linkedComplaintId String?
   createdAt   DateTime   @default(now())
+  
+  // Target filters for notification/search
+  latitude          Float?
+  longitude         Float?
+  notifyRadius      Int?       @default(1) // in km
+  targetCommunityId String?
+  targetOrganizationId String?
   
   userId      String?
   user        User?      @relation(fields: [userId], references: [id])
@@ -74,6 +87,16 @@ model Complaint {
   feedbackComment String?
   createdAt   DateTime @default(now())
   
+  // Cash Prize
+  cashPrize       String?  // Can be "1000 INR" or "Reward"
+  
+  // Target filters for notification/search
+  latitude          Float?
+  longitude         Float?
+  notifyRadius      Int?       @default(1) // in km
+  targetCommunityId String?
+  targetOrganizationId String?
+  
   userId      String?
   user        User?      @relation(fields: [userId], references: [id])
 }
@@ -89,4 +112,49 @@ model Notification {
   
   userId    String
   user      User     @relation(fields: [userId], references: [id])
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  createdAt   DateTime @default(now())
+  
+  creatorId   String
+  creator     User     @relation("OrgCreator", fields: [creatorId], references: [id])
+  
+  admins      OrganizationAdmin[]
+  communities Community[]
+}
+
+model OrganizationAdmin {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+}
+
+model Community {
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  createdAt      DateTime      @default(now())
+  
+  creatorId      String
+  creator        User          @relation("CommunityCreator", fields: [creatorId], references: [id])
+  
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  
+  members        CommunityMember[]
+}
+
+model CommunityMember {
+  id          String    @id @default(uuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  role        String    @default("MEMBER") // ADMIN, MEMBER
+  createdAt   DateTime  @default(now())
 }

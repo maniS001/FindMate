@@ -17,6 +17,7 @@ export default function Input({ label, error, style, ...props }: InputProps) {
             <TextInput
                 style={[
                     styles.input,
+                    props.multiline && { height: 120, textAlignVertical: 'top', paddingTop: 16 },
                     {
                         backgroundColor: colors.surface,
                         borderColor: error ? colors.error : (isFocused ? colors.primary : colors.border),

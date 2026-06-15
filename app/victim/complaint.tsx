@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import * as Location from 'expo-location';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
@@ -16,11 +17,41 @@ import { showAlert } from '../../utils/alert';
 export default function FileComplaint() {
     const router = useRouter();
     const { colors } = useTheme();
-    const { user } = useAuth();
+    const { user, token } = useAuth();
     const [loading, setLoading] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
     const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
     const [aiFeedback, setAiFeedback] = useState<{ issues: string[]; suggestions: string[] } | null>(null);
+
+    const [comms, setComms] = useState<any[]>([]);
+    const [orgs, setOrgs] = useState<any[]>([]);
+    const [notificationType, setNotificationType] = useState<'RADIUS' | 'COMMUNITY' | 'ORGANIZATION'>('RADIUS');
+    const [notifyRadius, setNotifyRadius] = useState('1');
+    const [targetCommunityId, setTargetCommunityId] = useState('');
+    const [targetOrganizationId, setTargetOrganizationId] = useState('');
+    const [cashPrize, setCashPrize] = useState('');
+
+    useEffect(() => {
+        if (token) {
+            fetch(`${API_URL}/users/me/communities`, { headers: { Authorization: `Bearer ${token}` }})
+                .then(async r => {
+                    if (!r.ok) throw new Error('Failed to fetch communities');
+                    const text = await r.text();
+                    try { return JSON.parse(text); } catch (e) { throw new Error('Invalid JSON'); }
+                })
+                .then(setComms)
+                .catch(e => console.log('Communities fetch error:', e.message));
+
+            fetch(`${API_URL}/users/me/orgs`, { headers: { Authorization: `Bearer ${token}` }})
+                .then(async r => {
+                    if (!r.ok) throw new Error('Failed to fetch orgs');
+                    const text = await r.text();
+                    try { return JSON.parse(text); } catch (e) { throw new Error('Invalid JSON'); }
+                })
+                .then(setOrgs)
+                .catch(e => console.log('Orgs fetch error:', e.message));
+        }
+    }, [token]);
 
     const [form, setForm] = useState({
         name: '',
@@ -44,15 +75,18 @@ export default function FileComplaint() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     name: form.name, category: form.category, 
-                    location: form.location, date: date.toISOString().split('T')[0] 
+                    location: form.location, date: date.toISOString().split('T')[0],
+                    role: 'victim'
                 }),
             });
             const data = await res.json();
-            if (data.description) {
+            if (data.error) {
+                showAlert('AI Error', data.error);
+            } else if (data.description) {
                 setForm(prev => ({ ...prev, description: data.description }));
             }
         } catch {
-            showAlert('Error', 'Failed to auto-generate description.');
+            showAlert('Error', 'Failed to auto-generate description. Check network.');
         } finally {
             setIsGeneratingDesc(false);
         }
@@ -79,6 +113,11 @@ export default function FileComplaint() {
                 }),
             });
             const aiData = await aiRes.json();
+            if (aiData.error) {
+                setAiFeedback({ issues: ['AI Service Error: ' + aiData.error], suggestions: [] });
+                setAiLoading(false);
+                return;
+            }
             if (!aiData.valid) {
                 setAiFeedback({ 
                     issues: aiData.issues?.length ? aiData.issues : [aiData.reason || 'Invalid data according to AI.'], 
@@ -95,6 +134,14 @@ export default function FileComplaint() {
 
         setLoading(true);
         try {
+            let loc = null;
+            if (notificationType === 'RADIUS') {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                if (status === 'granted') {
+                    loc = await Location.getCurrentPositionAsync({});
+                }
+            }
+
             const { convertImagesToBase64 } = await import('../../utils/imageUtils');
             const base64Images = form.imageUris.length > 0
                 ? await convertImagesToBase64(form.imageUris)
@@ -109,6 +156,12 @@ export default function FileComplaint() {
                 contactInfo: form.contactInfo,
                 imageUris: base64Images,
                 userId: user?.id,
+                cashPrize: cashPrize || undefined,
+                notifyRadius: notificationType === 'RADIUS' ? parseInt(notifyRadius) || 1 : undefined,
+                targetCommunityId: notificationType === 'COMMUNITY' ? targetCommunityId || undefined : undefined,
+                targetOrganizationId: notificationType === 'ORGANIZATION' ? targetOrganizationId || undefined : undefined,
+                latitude: loc ? loc.coords.latitude : undefined,
+                longitude: loc ? loc.coords.longitude : undefined,
             });
             router.push({
                 pathname: '/success',
@@ -180,7 +233,7 @@ export default function FileComplaint() {
                             value={form.description}
                             onChangeText={(text) => setForm({ ...form, description: text })}
                             multiline
-                            numberOfLines={4}
+                            numberOfLines={5}
                         />
 
                         <Input
@@ -196,6 +249,64 @@ export default function FileComplaint() {
                             onImagesSelected={(uris) => setForm({ ...form, imageUris: uris })}
                             initialImages={form.imageUris}
                         />
+
+                        <Input
+                            label="Cash Prize Announcement (Optional)"
+                            placeholder="e.g. 500 INR, Reward Gift"
+                            value={cashPrize}
+                            onChangeText={setCashPrize}
+                        />
+
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, marginTop: 16 }}>Notification Target</Text>
+                        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                            <TouchableOpacity onPress={() => setNotificationType('RADIUS')} style={{ padding: 8, borderWidth: 1, borderColor: notificationType === 'RADIUS' ? colors.primary : colors.border, borderRadius: 8, backgroundColor: notificationType === 'RADIUS' ? colors.primary + '10' : 'transparent' }}>
+                                <Text style={{ color: colors.text }}>Radius</Text>
+                            </TouchableOpacity>
+                            {comms.length > 0 && (
+                                <TouchableOpacity onPress={() => setNotificationType('COMMUNITY')} style={{ padding: 8, borderWidth: 1, borderColor: notificationType === 'COMMUNITY' ? colors.primary : colors.border, borderRadius: 8, backgroundColor: notificationType === 'COMMUNITY' ? colors.primary + '10' : 'transparent' }}>
+                                    <Text style={{ color: colors.text }}>Community</Text>
+                                </TouchableOpacity>
+                            )}
+                            {orgs.length > 0 && (
+                                <TouchableOpacity onPress={() => setNotificationType('ORGANIZATION')} style={{ padding: 8, borderWidth: 1, borderColor: notificationType === 'ORGANIZATION' ? colors.primary : colors.border, borderRadius: 8, backgroundColor: notificationType === 'ORGANIZATION' ? colors.primary + '10' : 'transparent' }}>
+                                    <Text style={{ color: colors.text }}>Organization</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {notificationType === 'RADIUS' && (
+                            <Input
+                                label="Radius (km)"
+                                placeholder="1 to 10"
+                                value={notifyRadius}
+                                onChangeText={setNotifyRadius}
+                                keyboardType="number-pad"
+                            />
+                        )}
+
+                        {notificationType === 'COMMUNITY' && (
+                            <View style={{ marginTop: 8 }}>
+                                <Text style={{ color: colors.textSecondary, marginBottom: 4 }}>Select Community ID (or name exactly):</Text>
+                                <Input
+                                    placeholder="Enter Community ID"
+                                    value={targetCommunityId}
+                                    onChangeText={setTargetCommunityId}
+                                />
+                                {comms.map(c => <Text key={c.id} style={{color: colors.primary, fontSize: 12}} onPress={() => setTargetCommunityId(c.id)}>{c.name} (Tap to select)</Text>)}
+                            </View>
+                        )}
+
+                        {notificationType === 'ORGANIZATION' && (
+                            <View style={{ marginTop: 8 }}>
+                                <Text style={{ color: colors.textSecondary, marginBottom: 4 }}>Select Organization ID:</Text>
+                                <Input
+                                    placeholder="Enter Org ID"
+                                    value={targetOrganizationId}
+                                    onChangeText={setTargetOrganizationId}
+                                />
+                                {orgs.map(o => <Text key={o.id} style={{color: colors.primary, fontSize: 12}} onPress={() => setTargetOrganizationId(o.id)}>{o.name} (Tap to select)</Text>)}
+                            </View>
+                        )}
 
                         {/* AI Feedback Banner */}
                         {aiFeedback && (

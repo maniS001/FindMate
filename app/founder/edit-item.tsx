@@ -113,7 +113,8 @@ export default function EditFoundItem() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     name: form.name, category: form.category, 
-                    location: form.location, date: date.toISOString().split('T')[0] 
+                    location: form.location, date: date.toISOString().split('T')[0],
+                    role: 'founder'
                 }),
             });
             const data = await res.json();
@@ -308,7 +309,7 @@ export default function EditFoundItem() {
                         <Input
                             placeholder="Brief description..."
                             multiline
-                            numberOfLines={3}
+                            numberOfLines={5}
                             style={{ height: 80, textAlignVertical: 'top' }}
                             value={form.description}
                             onChangeText={(text) => {

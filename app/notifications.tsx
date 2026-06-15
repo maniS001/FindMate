@@ -401,9 +401,9 @@ const styles = StyleSheet.create({
     },
     removeBtn: {
         position: 'absolute',
-        top: 8,
-        right: 8,
-        padding: 4,
+        top: 2,
+        right: 2,
+        padding: 8,
         zIndex: 10,
     },
     clearAllButton: {

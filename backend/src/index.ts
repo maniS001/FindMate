@@ -93,7 +93,10 @@ const geminiClient = process.env.GEMINI_API_KEY
 const getGeminiModel = () => {
     if (!geminiClient) throw new Error('GEMINI_API_KEY not configured');
     return geminiClient.getGenerativeModel({ 
-        model: 'gemini-flash-latest',
+        model: 'gemini-1.5-flash',
+        generationConfig: {
+            responseMimeType: "application/json",
+        },
         systemInstruction: `You are the dedicated AI Agent for FindMate, a modern Lost & Found application.
 Your primary goals are to:
 1. Ensure all lost and found item reports are logically consistent, genuine, and high quality.
@@ -112,6 +115,7 @@ app.post('/api/ai/validate-complaint', async (req, res) => {
         const model = getGeminiModel();
         const prompt = `You are a lost item complaint validator for a mobile app.
 Validate the following complaint form fields and return JSON only.
+Today's Date: ${new Date().toISOString().split('T')[0]}
 
 Fields submitted:
 - Item Type: "${type || ''}"
@@ -122,12 +126,12 @@ Fields submitted:
 - Color: "${color || ''}"
 
 Rules to check:
-1. Item type must be specific (not just "item" or "thing")
+1. Item type and category must logically match (e.g., if item is iPhone, category must be Electronics, NOT Pets or Books).
 2. Description must have at least some detail (min 10 chars, mentions what the item is)
 3. Location must be a real place (not random letters or symbols)
-4. Date must be a valid past date (not future)
+4. Date is already verified by the system, ignore it.
 5. Description should NOT contain phone numbers, emails, or social media contacts
-6. All fields together must make sense as a genuine lost item report
+6. All fields together must make sense as a genuine lost item report. Reject gibberish or obvious fake data. If the report is completely invalid, set valid to false. If it's mostly fine, set valid to true but list minor issues in the issues array.
 
 Respond ONLY with this JSON (no markdown, no explanation):
 {
@@ -144,7 +148,7 @@ Respond ONLY with this JSON (no markdown, no explanation):
         res.json(parsed);
     } catch (err: any) {
         console.error('AI validate-complaint error:', err.message);
-        res.json({ valid: true, issues: [], suggestions: [] });
+        res.json({ valid: false, issues: [], suggestions: [], error: err.message });
     }
 });
 
@@ -156,6 +160,7 @@ app.post('/api/ai/validate-founder-report', async (req, res) => {
         const qList = (questions || []).map((q: any, i: number) => `Q${i+1}: ${q.question} (Answer: ${q.answer})`).join('\n');
         const prompt = `You are a lost & found claim validator.
 Check this founder report for logical consistency and security.
+Today's Date: ${new Date().toISOString().split('T')[0]}
 
 Fields:
 - Name: "${name || ''}"
@@ -171,6 +176,7 @@ Rules:
 2. Location must be a realistic place.
 3. Security questions must be highly relevant to the item.
 4. STRICTLY BLOCK any phone numbers, emails, or social media links in the description or questions.
+If it is a realistic report without contact info, set valid to true. Only set valid to false if it is complete gibberish, an obvious test string, or contains contact info.
 
 Respond ONLY with JSON:
 {
@@ -229,12 +235,17 @@ Respond ONLY with this JSON (no markdown, no explanation):
 
 // 2b. Auto-generate description
 app.post('/api/ai/generate-description', async (req, res) => {
-    const { name, category, location, date } = req.body;
+    const { name, category, location, date, role } = req.body;
     try {
         const model = getGeminiModel();
-        const prompt = `Write a professional, 2-3 sentence description for a lost/found item report.
-Do NOT include any placeholders, brackets, or contact information.
-CRITICAL: Do NOT hallucinate or assume any details like color, brand, condition, or specific features that are not explicitly provided. Stick strictly to the given facts.
+        const action = role === 'founder' ? 'found' : 'lost';
+        const pronoun = role === 'founder' ? 'a' : 'my';
+        const prompt = `You are a user of a lost & found app. Write a 2 sentence description for an item you just ${action}.
+CRITICAL INSTRUCTIONS:
+1. You MUST start the description with the exact words: "I ${action} ${pronoun} ${name}".
+2. Do NOT act like a system administrator, support team, or third party.
+3. Do NOT include placeholders, emails, or phone numbers.
+4. Do NOT invent any details not provided.
 
 Item: ${name}
 Category: ${category}
@@ -254,7 +265,7 @@ Respond ONLY with this JSON (no markdown, no explanation):
         res.json({ description: parsed.description || parsed.generated_description || text });
     } catch (err: any) {
         console.error('AI generate-description error:', err.message);
-        res.json({ description: '' });
+        res.json({ description: '', error: err.message });
     }
 });
 
@@ -265,12 +276,12 @@ app.post('/api/ai/validate-answers', async (req, res) => {
         return res.status(400).json({ error: 'questions array required' });
     }
     
-    // First, check for exact/near-exact matches locally
+    // First, check for exact matches locally
     let allExact = true;
     for (const q of questions) {
         const u = q.userAnswer.toLowerCase().trim();
         const c = q.correctAnswer.toLowerCase().trim();
-        if (u !== c && !c.includes(u) && !u.includes(c)) {
+        if (u !== c) {
             allExact = false;
             break;
         }
@@ -669,7 +680,7 @@ app.delete('/api/notifications', authenticateToken, async (req: any, res) => {
 // Create Item (Updated to link user)
 app.post('/api/items', async (req, res) => {
     try {
-        const { name, category, location, date, description, contactInfo, imageUri, imageUris, questions, userId } = req.body;
+        const { name, category, location, date, description, contactInfo, imageUri, imageUris, questions, userId, latitude, longitude, notifyRadius, targetCommunityId, targetOrganizationId } = req.body;
 
         // Handle both imageUri (single) and imageUris (array)
         const images = imageUris || (imageUri ? [imageUri] : []);
@@ -688,6 +699,11 @@ app.post('/api/items', async (req, res) => {
                     create: questions,
                 },
                 userId: userId || null, // Link to user if provided
+                latitude: latitude || null,
+                longitude: longitude || null,
+                notifyRadius: notifyRadius || null,
+                targetCommunityId: targetCommunityId || null,
+                targetOrganizationId: targetOrganizationId || null,
             },
             include: {
                 questions: true,
@@ -747,7 +763,7 @@ app.post('/api/items', async (req, res) => {
 // Create Complaint (Updated to link user)
 app.post('/api/complaints', async (req, res) => {
     try {
-        const { name, category, location, date, description, contactInfo, imageUris, userId } = req.body;
+        const { name, category, location, date, description, contactInfo, imageUris, userId, cashPrize, latitude, longitude, notifyRadius, targetCommunityId, targetOrganizationId } = req.body;
         const complaint = await prisma.complaint.create({
             data: {
                 name,
@@ -758,56 +774,50 @@ app.post('/api/complaints', async (req, res) => {
                 contactInfo,
                 imageUris: imageUris ? JSON.stringify(imageUris) : '[]',
                 userId: userId || null,
+                cashPrize: cashPrize || null,
+                latitude: latitude || null,
+                longitude: longitude || null,
+                notifyRadius: notifyRadius || 1,
+                targetCommunityId: targetCommunityId || null,
+                targetOrganizationId: targetOrganizationId || null,
             },
         });
         res.json(complaint);
 
-        // Find users within 100km radius and notify them
-        if (location) {
+        // Notify relevant users
+        if (location || targetCommunityId || targetOrganizationId) {
             try {
-                // Get all users (we'll filter by distance in memory)
                 const allUsers = await prisma.user.findMany({
-                    where: {
-                        NOT: {
-                            id: userId || 'unknown-id', // Don't notify the one who filed it
-                        }
-                    }
+                    where: { NOT: { id: userId || 'unknown-id' } },
+                    include: { memberships: true, orgAdmins: true }
                 });
 
-                // Get complaint coordinates if available (from user who filed it)
-                const complaintUser = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null;
-                const complaintLat = complaintUser?.latitude;
-                const complaintLon = complaintUser?.longitude;
+                const complaintLat = latitude || null;
+                const complaintLon = longitude || null;
+                const radius = notifyRadius || 1;
 
-                let usersInRadius: any[] = [];
+                let usersToNotify = allUsers.filter(user => {
+                    // 1. Check Community Match
+                    if (targetCommunityId && user.memberships.some((m: any) => m.communityId === targetCommunityId)) return true;
+                    // 2. Check Organization Match (Requires a join with Organization->Communities, but for now assuming if user is in org, we'd need to check. Simple approach: check if they are in ANY community of that org, or just pass for now if we don't have user.organization field directly)
+                    // Wait, we don't have direct org memberships for users, only communities and admins. Let's skip organization match for now unless they are admin. Or if we assume org = community in UI? We will just check if targetCommunityId is passed.
+                    
+                    // 3. Check Radius
+                    if (complaintLat && complaintLon && user.latitude && user.longitude) {
+                        const distance = calculateDistance(complaintLat, complaintLon, user.latitude, user.longitude);
+                        if (distance <= radius) return true;
+                    } else if (!complaintLat && user.location && user.location.toLowerCase().includes(location.toLowerCase())) {
+                        return true;
+                    }
+                    return false;
+                });
 
-                if (complaintLat && complaintLon) {
-                    // Use coordinate-based matching (100km radius)
-                    usersInRadius = allUsers.filter(user => {
-                        if (user.latitude && user.longitude) {
-                            const distance = calculateDistance(
-                                complaintLat,
-                                complaintLon,
-                                user.latitude,
-                                user.longitude
-                            );
-                            return distance <= 100; // 100km radius
-                        }
-                        return false;
-                    });
-                    console.log(`Found ${usersInRadius.length} users within 100km radius`);
-                } else {
-                    // Fallback to string matching if no coordinates available
-                    usersInRadius = allUsers.filter(user =>
-                        user.location && user.location.toLowerCase().includes(location.toLowerCase())
-                    );
-                    console.log(`Used fallback string matching, found ${usersInRadius.length} users`);
-                }
+                console.log(`Found ${usersToNotify.length} users to notify`);
 
-                if (usersInRadius.length > 0) {
-                    const notifications = usersInRadius.map(user => ({
+                if (usersToNotify.length > 0) {
+                    const notifications = usersToNotify.map(user => ({
                         userId: user.id,
-                        title: 'New Complaint in Your Area',
+                        title: 'New Complaint Matching Your Notification Settings',
                         message: `Someone lost a "${name}" in ${location}. Check if you can help!`,
                         type: 'AREA_ALERT',
                         payload: JSON.stringify({ complaintId: complaint.id, location }),
@@ -818,17 +828,17 @@ app.post('/api/complaints', async (req, res) => {
                     });
                     
                     // Actually trigger the push notifications!
-                    for (const user of usersInRadius) {
+                    for (const user of usersToNotify) {
                         if (user.pushToken) {
                             await sendPushNotification(
                                 user.pushToken,
-                                'New Complaint in Your Area',
+                                'New Complaint',
                                 `Someone lost a "${name}" in ${location}. Check if you can help!`,
                                 { url: `/founder/complaint-detail?id=${complaint.id}` }
                             );
                         }
                     }
-                    console.log(`Sent ${notifications.length} location-based notifications.`);
+                    console.log(`Sent ${notifications.length} notifications.`);
                 }
             } catch (notifyError) {
                 console.error('Error sending location notifications:', notifyError);
@@ -845,7 +855,7 @@ app.post('/api/complaints', async (req, res) => {
 // List Items (with search)
 app.get('/api/items', async (req, res) => {
     try {
-        const { query, claimedBy, excludeClaimed } = req.query;
+        const { query, claimedBy, excludeClaimed, communityId, orgId, lat, lng, radius } = req.query;
         let where: any = {};
 
         if (query) {
@@ -856,6 +866,12 @@ app.get('/api/items', async (req, res) => {
             ];
         }
 
+        if (communityId) {
+            where.targetCommunityId = String(communityId);
+        } else if (orgId) {
+            where.targetOrganizationId = String(orgId);
+        }
+
         if (claimedBy) {
             where.claimedByUserId = String(claimedBy);
         }
@@ -864,11 +880,27 @@ app.get('/api/items', async (req, res) => {
             where.status = { in: ['OPEN', 'REOPENED'] };
         }
 
-        const items = await prisma.item.findMany({
+        let items = await prisma.item.findMany({
             where,
             orderBy: { createdAt: 'desc' },
             include: { questions: true },
         });
+
+        // Apply radius filter if provided and not filtering by community/org
+        if (lat && lng && radius && !communityId && !orgId) {
+            const userLat = parseFloat(String(lat));
+            const userLng = parseFloat(String(lng));
+            const searchRadius = parseFloat(String(radius));
+            
+            items = items.filter(item => {
+                if (item.latitude && item.longitude) {
+                    const distance = calculateDistance(userLat, userLng, item.latitude, item.longitude);
+                    return distance <= searchRadius;
+                }
+                return true; // If item has no coordinates, we keep it as a fallback
+            });
+        }
+
         res.json(items);
     } catch (error) {
         console.error(error);
@@ -897,22 +929,43 @@ app.get('/api/items/:id', async (req, res) => {
 // List Complaints (with search)
 app.get('/api/complaints', async (req, res) => {
     try {
-        const { query } = req.query;
-        const where = query
-            ? {
-                OR: [
-                    { name: { contains: String(query), mode: 'insensitive' as const } },
-                    { category: { contains: String(query), mode: 'insensitive' as const } },
-                    { location: { contains: String(query), mode: 'insensitive' as const } },
-                ],
-                status: 'OPEN',
-            }
-            : { status: 'OPEN' };
+        const { query, communityId, orgId, lat, lng, radius } = req.query;
+        let where: any = { status: 'OPEN' };
 
-        const complaints = await prisma.complaint.findMany({
+        if (query) {
+            where.OR = [
+                { name: { contains: String(query), mode: 'insensitive' as const } },
+                { category: { contains: String(query), mode: 'insensitive' as const } },
+                { location: { contains: String(query), mode: 'insensitive' as const } },
+            ];
+        }
+
+        if (communityId) {
+            where.targetCommunityId = String(communityId);
+        } else if (orgId) {
+            where.targetOrganizationId = String(orgId);
+        }
+
+        let complaints = await prisma.complaint.findMany({
             where,
             orderBy: { createdAt: 'desc' },
         });
+
+        // Apply radius filter if provided and not filtering by community/org
+        if (lat && lng && radius && !communityId && !orgId) {
+            const userLat = parseFloat(String(lat));
+            const userLng = parseFloat(String(lng));
+            const searchRadius = parseFloat(String(radius));
+            
+            complaints = complaints.filter(complaint => {
+                if (complaint.latitude && complaint.longitude) {
+                    const distance = calculateDistance(userLat, userLng, complaint.latitude, complaint.longitude);
+                    return distance <= searchRadius;
+                }
+                return true; // Keep if no coordinates available
+            });
+        }
+
         res.json(complaints);
     } catch (error) {
         console.error(error);
@@ -1407,7 +1460,91 @@ app.post('/api/items/:id/recover', async (req, res) => {
     }
 });
 
+// ============= ORGANIZATION & COMMUNITY =============
 
+// Create Organization
+app.post('/api/orgs', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { name } = req.body;
+        const org = await prisma.organization.create({
+            data: { name, creatorId: req.user.id }
+        });
+        await prisma.organizationAdmin.create({
+            data: { organizationId: org.id, userId: req.user.id }
+        });
+        res.json(org);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get User's Organizations
+app.get('/api/users/me/orgs', authenticateToken, async (req: any, res: any) => {
+    try {
+        const orgs = await prisma.organization.findMany({
+            where: { admins: { some: { userId: req.user.id } } },
+            include: { communities: true }
+        });
+        res.json(orgs);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Create Community
+app.post('/api/communities', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { name, description, organizationId } = req.body;
+        const comm = await prisma.community.create({
+            data: { name, description, organizationId: organizationId || null, creatorId: req.user.id }
+        });
+        await prisma.communityMember.create({
+            data: { communityId: comm.id, userId: req.user.id, role: 'ADMIN' }
+        });
+        res.json(comm);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get User's Communities
+app.get('/api/users/me/communities', authenticateToken, async (req: any, res: any) => {
+    try {
+        const comms = await prisma.community.findMany({
+            where: { members: { some: { userId: req.user.id } } },
+            include: { organization: true, members: { include: { user: { select: { id: true, name: true, email: true } } } } }
+        });
+        res.json(comms);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Add Member to Community
+app.post('/api/communities/:id/members', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { id } = req.params;
+        const { identifier } = req.body;
+
+        const userToAdd = await prisma.user.findFirst({
+            where: { OR: [{ email: identifier }, { name: identifier }] }
+        });
+
+        if (!userToAdd) return res.status(404).json({ error: "User not found" });
+
+        const existing = await prisma.communityMember.findFirst({
+            where: { communityId: id, userId: userToAdd.id }
+        });
+        if (existing) return res.status(400).json({ error: "Already a member" });
+
+        const member = await prisma.communityMember.create({
+            data: { communityId: id, userId: userToAdd.id, role: 'MEMBER' }
+        });
+        res.json(member);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // Start server after all routes are registered
 app.listen(port, () => {

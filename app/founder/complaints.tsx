@@ -109,7 +109,14 @@ export default function ViewComplaints() {
                         <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>{item.date}</Text>
                     </View>
 
-                    <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
+                    {item.cashPrize && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, backgroundColor: colors.success + '15', padding: 6, borderRadius: 8, alignSelf: 'flex-start' }}>
+                            <Text style={{ fontSize: 16 }}>💰</Text>
+                            <Text style={{ color: colors.success, fontWeight: '700', fontSize: 12 }}>Reward: {item.cashPrize}</Text>
+                        </View>
+                    )}
+
+                    <Text style={[styles.description, { color: colors.textSecondary, marginTop: 8 }]} numberOfLines={2}>
                         {item.description}
                     </Text>
 

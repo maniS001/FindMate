@@ -363,6 +363,28 @@ export default function AccountScreen() {
                     </View>
                 </View>
 
+                {/* Organizations & Communities */}
+                <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>Network</Text>
+                <View style={styles.networkContainer}>
+                    <TouchableOpacity 
+                        style={[styles.networkCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                        onPress={() => router.push('/account/organizations')}
+                    >
+                        <FileText size={24} color={colors.primary} />
+                        <Text style={[styles.networkTitle, { color: colors.text }]}>Organizations</Text>
+                        <Text style={[styles.networkSubtitle, { color: colors.textSecondary }]}>Manage your orgs</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                        style={[styles.networkCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                        onPress={() => router.push('/account/communities')}
+                    >
+                        <FileText size={24} color={colors.primary} />
+                        <Text style={[styles.networkTitle, { color: colors.text }]}>Communities</Text>
+                        <Text style={[styles.networkSubtitle, { color: colors.textSecondary }]}>Manage your groups</Text>
+                    </TouchableOpacity>
+                </View>
+
                 {/* Reported Items (Lost) Section */}
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>My Complaints</Text>
 
@@ -664,6 +686,29 @@ const styles = StyleSheet.create({
     statsContainer: {
         flexDirection: 'row',
         gap: 16,
+        marginBottom: 24,
+    },
+    networkContainer: {
+        flexDirection: 'row',
+        gap: 16,
+        marginBottom: 24,
+    },
+    networkCard: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    networkTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginTop: 8,
+    },
+    networkSubtitle: {
+        fontSize: 12,
+        marginTop: 4,
     },
     statCard: {
         flex: 1,

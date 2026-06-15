@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CategoryPicker from '../../components/CategoryPicker';
@@ -20,6 +20,36 @@ export default function EditComplaint() {
     const [submitting, setSubmitting] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiFeedback, setAiFeedback] = useState<{ issues: string[]; suggestions: string[] } | null>(null);
+    const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+
+    const handleAutoGenerate = async () => {
+        if (!form.name || !form.category || !form.location) {
+            Alert.alert('Missing Info', 'Please fill Item Name, Category, and Location first.');
+            return;
+        }
+        setIsGeneratingDesc(true);
+        try {
+            const res = await fetch(`${API_URL}/ai/generate-description`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: form.name,
+                    category: form.category,
+                    location: form.location,
+                    date: date.toISOString().split('T')[0],
+                    role: 'victim'
+                })
+            });
+            const data = await res.json();
+            if (data.description) {
+                setForm({ ...form, description: data.description });
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsGeneratingDesc(false);
+        }
+    };
 
     const [form, setForm] = useState({
         name: '',
@@ -193,13 +223,21 @@ export default function EditComplaint() {
                             onChange={setDate}
                         />
 
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, flex: 1 }}>Description</Text>
+                            <TouchableOpacity onPress={handleAutoGenerate} disabled={isGeneratingDesc} style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                {isGeneratingDesc ? <ActivityIndicator size="small" color={colors.primary} /> : null}
+                                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
+                                    {isGeneratingDesc ? 'Generating...' : '✨ Auto-Generate'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                         <Input
-                            label="Description"
                             placeholder="Additional details about the item..."
                             value={form.description}
                             onChangeText={(text) => setForm({ ...form, description: text })}
                             multiline
-                            numberOfLines={4}
+                            numberOfLines={5}
                         />
 
                         <Input

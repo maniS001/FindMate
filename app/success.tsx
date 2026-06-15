@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { BackHandler, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,9 +31,18 @@ export default function Success() {
             fetchUserComplaints();
         }
 
+        // Handle Android hardware back button
+        const onBackPress = () => {
+            router.dismissAll();
+            router.replace('/');
+            return true; // Prevent default back navigation
+        };
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
         // Auto-close requirement: If we showed contact info, show popup on exit
         const hasContactInfo = !!params.contactInfo;
         return () => {
+            backHandler.remove();
             if (hasContactInfo) {
                 showAlert(
                     'Complaint Resolved',
@@ -42,7 +51,7 @@ export default function Success() {
                 );
             }
         };
-    }, [params.itemId, user, params.contactInfo]);
+    }, [params.itemId, user, params.contactInfo, router]);
 
     const fetchUserComplaints = async () => {
         try {
@@ -176,7 +185,7 @@ export default function Success() {
                             <Button
                                 title="Skip"
                                 variant="outline"
-                                onPress={() => router.push('/')}
+                                onPress={() => { router.dismissAll(); router.replace('/'); }}
                                 style={{ flex: 1 }}
                             />
                             <Button
@@ -232,7 +241,7 @@ export default function Success() {
                 <View style={styles.buttonContainer}>
                     <Button
                         title="Go to Home"
-                        onPress={() => router.push('/')}
+                        onPress={() => { router.dismissAll(); router.replace('/'); }}
                         style={{ marginBottom: 12 }}
                         variant="primary"
                     />

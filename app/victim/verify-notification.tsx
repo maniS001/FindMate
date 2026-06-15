@@ -200,6 +200,22 @@ export default function VerifyNotificationScreen() {
         }
     };
 
+    // Intercept hardware back button on success screen
+    useEffect(() => {
+        if (!showSuccess) return;
+        const onBackPress = () => {
+            router.dismissAll();
+            router.replace('/');
+            return true;
+        };
+        const backHandler = import('react-native').then(rn => {
+            return rn.BackHandler.addEventListener('hardwareBackPress', onBackPress);
+        });
+        return () => {
+            backHandler.then(bh => bh.remove());
+        };
+    }, [showSuccess, router]);
+
     // Render Success Screen
     if (showSuccess) {
         return (
@@ -223,7 +239,7 @@ export default function VerifyNotificationScreen() {
 
                         <Button
                             title="Go to Home"
-                            onPress={() => router.replace('/')}
+                            onPress={() => { router.dismissAll(); router.replace('/'); }}
                             style={{ width: '100%', marginTop: 24 }}
                         />
                     </View>

@@ -37,6 +37,7 @@ export interface Complaint {
     closureReason?: string;
     reopenReason?: string;
     resolvedAt?: string;
+    cashPrize?: string;
 }
 
 export interface Notification {
