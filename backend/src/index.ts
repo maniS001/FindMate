@@ -110,34 +110,32 @@ Always respond exactly in the requested JSON format without markdown formatting.
 
 // 1. Validate victim complaint form fields
 app.post('/api/ai/validate-complaint', async (req, res) => {
-    const { type, description, location, date, brand, color } = req.body;
+    const { type, description, location } = req.body;
     try {
         const model = getGeminiModel();
         const prompt = `You are a lost item complaint validator for a mobile app.
-Validate the following complaint form fields and return JSON only.
-Today's Date: ${new Date().toISOString().split('T')[0]}
+Validate the following fields and return JSON only.
+IMPORTANT: Do NOT validate or comment on dates at all. Dates are handled separately by the app.
 
 Fields submitted:
-- Item Type: "${type || ''}"
+- Item Type/Category: "${type || ''}"
 - Description: "${description || ''}"
 - Location Lost: "${location || ''}"
-- Date Lost: "${date || ''}"
-- Brand: "${brand || ''}"
-- Color: "${color || ''}"
 
-Rules to check:
-1. Item type and category must logically match (e.g., if item is iPhone, category must be Electronics, NOT Pets or Books).
-2. Description must have at least some detail (min 10 chars, mentions what the item is)
-3. Location must be a real place (not random letters or symbols)
-4. Date is already verified by the system, ignore it.
-5. Description should NOT contain phone numbers, emails, or social media contacts
-6. All fields together must make sense as a genuine lost item report. Reject gibberish or obvious fake data. If the report is completely invalid, set valid to false. If it's mostly fine, set valid to true but list minor issues in the issues array.
+Rules (date is excluded, do not mention it):
+1. Item type and category must logically match (e.g., iPhone must be Electronics, NOT Pets or Books).
+2. Description must be at least 5 characters and mention what the item is. Empty or very short descriptions are OK — mark valid:true but suggest they add more detail.
+3. Location must look like a real place (not random letters like "asdf" or symbols).
+4. Description must NOT contain phone numbers, emails, or social media handles.
+5. If item type is gibberish (like "asdf" or "123"), set valid:false.
+6. If location is gibberish (random letters), set valid:false.
+7. Be lenient — if the report is mostly genuine, set valid:true even if details are sparse.
 
-Respond ONLY with this JSON (no markdown, no explanation):
+Respond ONLY with this JSON (no markdown, no explanation, no date comments):
 {
-  "valid": true/false,
-  "issues": ["issue1", "issue2"],
-  "suggestions": ["suggestion1"]
+  "valid": true or false,
+  "issues": ["list only real issues, never mention date"],
+  "suggestions": ["optional improvements"]
 }`;
 
         const result = await model.generateContent(prompt);
@@ -145,10 +143,15 @@ Respond ONLY with this JSON (no markdown, no explanation):
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
         const parsed = JSON.parse(text);
+        // Strip any date-related issues the AI sneaked in anyway
+        if (parsed.issues) {
+            parsed.issues = parsed.issues.filter((i: string) => !/(date|future|past|time|when)/i.test(i));
+        }
         res.json(parsed);
     } catch (err: any) {
         console.error('AI validate-complaint error:', err.message);
-        res.json({ valid: false, issues: [], suggestions: [], error: err.message });
+        // On AI failure, don't block the submission
+        res.json({ valid: true, issues: [], suggestions: [], error: err.message });
     }
 });
 
@@ -238,23 +241,32 @@ app.post('/api/ai/generate-description', async (req, res) => {
     const { name, category, location, date, role } = req.body;
     try {
         const model = getGeminiModel();
-        const action = role === 'founder' ? 'found' : 'lost';
-        const pronoun = role === 'founder' ? 'a' : 'my';
-        const prompt = `You are a user of a lost & found app. Write a 2 sentence description for an item you just ${action}.
-CRITICAL INSTRUCTIONS:
-1. You MUST start the description with the exact words: "I ${action} ${pronoun} ${name}".
-2. Do NOT act like a system administrator, support team, or third party.
-3. Do NOT include placeholders, emails, or phone numbers.
-4. Do NOT invent any details not provided.
+        const isVictim = role !== 'founder';
+        const action = isVictim ? 'lost' : 'found';
+        const firstWord = isVictim ? 'I lost my' : 'I found a';
 
-Item: ${name}
-Category: ${category}
-Location: ${location}
-Date: ${date}
+        const prompt = `You are a user of a lost & found app writing a personal note.
+Write exactly 2 sentences from a FIRST-PERSON perspective describing an item you ${action}.
 
-Respond ONLY with this JSON (no markdown, no explanation):
+CRITICAL RULES — you will be rejected if you break any:
+1. The VERY FIRST words of the description MUST be: "${firstWord} ${name}"
+   Example for victim: "I lost my ${name} at ${location}..."
+   Example for founder: "I found a ${name} at ${location}..."
+2. Write as the PERSON who ${action} the item — NOT as a support team or system.
+3. Do NOT use phrases like "reported", "please contact", "FindMate", "contact support".
+4. Do NOT include phone numbers, emails, or placeholder text.
+5. Do NOT invent details beyond what is provided.
+6. Keep it natural and personal, like a real person writing.
+
+Item details:
+- Name: ${name}
+- Category: ${category}
+- Location: ${location}
+- Date: ${date}
+
+Respond ONLY with this JSON (no markdown, no extra text):
 {
-  "description": "the generated text description"
+  "description": "the 2-sentence personal description starting with '${firstWord} ${name}'"
 }`;
 
         const result = await model.generateContent(prompt);
@@ -262,7 +274,12 @@ Respond ONLY with this JSON (no markdown, no explanation):
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
         const parsed = JSON.parse(text);
-        res.json({ description: parsed.description || parsed.generated_description || text });
+        let desc = parsed.description || '';
+        // Enforce first-person start as a safety net
+        if (desc && !desc.toLowerCase().startsWith('i ')) {
+            desc = `${firstWord} ${name} at ${location} on ${date}. ${desc}`;
+        }
+        res.json({ description: desc });
     } catch (err: any) {
         console.error('AI generate-description error:', err.message);
         res.json({ description: '', error: err.message });

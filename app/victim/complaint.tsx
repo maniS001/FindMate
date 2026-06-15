@@ -110,7 +110,7 @@ export default function FileComplaint() {
                     type: form.name + ' ' + form.category,
                     description: form.description,
                     location: form.location,
-                    date: date.toISOString().split('T')[0],
+                    // date intentionally excluded - validated separately by DatePicker UI
                 }),
             });
             const aiData = await aiRes.json();
