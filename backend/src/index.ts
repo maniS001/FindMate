@@ -90,10 +90,19 @@ const geminiClient = process.env.GEMINI_API_KEY
     ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
     : null;
 
-const getGeminiModel = () => {
+// Try models in order of preference (newest first)
+const GEMINI_MODELS = [
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro-latest',
+];
+
+const getGeminiModel = (modelIndex = 0) => {
     if (!geminiClient) throw new Error('GEMINI_API_KEY not configured');
-    return geminiClient.getGenerativeModel({ 
-        model: 'gemini-1.5-flash',
+    const modelName = GEMINI_MODELS[modelIndex] || GEMINI_MODELS[0];
+    return geminiClient.getGenerativeModel({
+        model: modelName,
         generationConfig: {
             responseMimeType: "application/json",
         },
@@ -108,12 +117,33 @@ Always respond exactly in the requested JSON format without markdown formatting.
 
 // ============= AI Validation Endpoints =============
 
+// Robust Gemini call — tries each model in fallback order
+async function callGemini(prompt: string): Promise<string> {
+    if (!geminiClient) throw new Error('GEMINI_API_KEY not configured');
+    let lastErr: any;
+    for (let i = 0; i < GEMINI_MODELS.length; i++) {
+        try {
+            const model = getGeminiModel(i);
+            const result = await model.generateContent(prompt);
+            return result.response.text().trim();
+        } catch (err: any) {
+            lastErr = err;
+            const msg = err.message || '';
+            // Only retry on model-not-found errors
+            if (msg.includes('not found') || msg.includes('404') || msg.includes('not supported')) {
+                console.warn(`Model ${GEMINI_MODELS[i]} failed, trying next...`);
+                continue;
+            }
+            throw err; // Other errors (auth, network) — don't retry
+        }
+    }
+    throw lastErr;
+}
+
 // 1. Validate victim complaint form fields
 app.post('/api/ai/validate-complaint', async (req, res) => {
     const { type, description, location } = req.body;
-    try {
-        const model = getGeminiModel();
-        const prompt = `You are a lost item complaint validator for a mobile app.
+    const prompt = `You are a lost item complaint validator for a mobile app.
 Validate the following fields and return JSON only.
 IMPORTANT: Do NOT validate or comment on dates at all. Dates are handled separately by the app.
 
@@ -137,9 +167,8 @@ Respond ONLY with this JSON (no markdown, no explanation, no date comments):
   "issues": ["list only real issues, never mention date"],
   "suggestions": ["optional improvements"]
 }`;
-
-        const result = await model.generateContent(prompt);
-        let text = result.response.text().trim();
+    try {
+        let text = await callGemini(prompt);
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
         const parsed = JSON.parse(text);
@@ -158,10 +187,8 @@ Respond ONLY with this JSON (no markdown, no explanation, no date comments):
 // 1b. Validate founder report form fields
 app.post('/api/ai/validate-founder-report', async (req, res) => {
     const { name, category, location, date, description, questions } = req.body;
-    try {
-        const model = getGeminiModel();
-        const qList = (questions || []).map((q: any, i: number) => `Q${i+1}: ${q.question} (Answer: ${q.answer})`).join('\n');
-        const prompt = `You are a lost & found claim validator.
+    const qList = (questions || []).map((q: any, i: number) => `Q${i+1}: ${q.question} (Answer: ${q.answer})`).join('\n');
+    const prompt = `You are a lost & found claim validator.
 Check this founder report for logical consistency and security.
 Today's Date: ${new Date().toISOString().split('T')[0]}
 
@@ -188,9 +215,8 @@ Respond ONLY with JSON:
   "issues": ["list of issues"],
   "detectedContactInfo": ["any detected contact info"]
 }`;
-
-        const result = await model.generateContent(prompt);
-        let text = result.response.text().trim();
+    try {
+        let text = await callGemini(prompt);
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
         res.json(JSON.parse(text));
@@ -203,9 +229,7 @@ Respond ONLY with JSON:
 // 2. Validate founder description (detect hidden phone numbers/contacts)
 app.post('/api/ai/validate-description', async (req, res) => {
     const { description } = req.body;
-    try {
-        const model = getGeminiModel();
-        const prompt = `You are a content moderator for a lost & found app.
+    const prompt = `You are a content moderator for a lost & found app.
 Check if the following description contains any contact information that should not be there.
 
 Description: "${description || ''}"
@@ -223,13 +247,11 @@ Respond ONLY with this JSON (no markdown, no explanation):
   "reason": "explanation if invalid, empty string if valid",
   "detected": ["detected contact info if any"]
 }`;
-
-        const result = await model.generateContent(prompt);
-        let text = result.response.text().trim();
+    try {
+        let text = await callGemini(prompt);
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
-        const parsed = JSON.parse(text);
-        res.json(parsed);
+        res.json(JSON.parse(text));
     } catch (err: any) {
         console.error('AI validate-description error:', err.message);
         res.json({ valid: true, reason: '', detected: [] });
@@ -239,13 +261,11 @@ Respond ONLY with this JSON (no markdown, no explanation):
 // 2b. Auto-generate description
 app.post('/api/ai/generate-description', async (req, res) => {
     const { name, category, location, date, role } = req.body;
-    try {
-        const model = getGeminiModel();
-        const isVictim = role !== 'founder';
-        const action = isVictim ? 'lost' : 'found';
-        const firstWord = isVictim ? 'I lost my' : 'I found a';
+    const isVictim = role !== 'founder';
+    const action = isVictim ? 'lost' : 'found';
+    const firstWord = isVictim ? 'I lost my' : 'I found a';
 
-        const prompt = `You are a user of a lost & found app writing a personal note.
+    const prompt = `You are a user of a lost & found app writing a personal note.
 Write exactly 2 sentences from a FIRST-PERSON perspective describing an item you ${action}.
 
 CRITICAL RULES — you will be rejected if you break any:
@@ -268,9 +288,8 @@ Respond ONLY with this JSON (no markdown, no extra text):
 {
   "description": "the 2-sentence personal description starting with '${firstWord} ${name}'"
 }`;
-
-        const result = await model.generateContent(prompt);
-        let text = result.response.text().trim();
+    try {
+        let text = await callGemini(prompt);
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
         const parsed = JSON.parse(text);
@@ -309,7 +328,6 @@ app.post('/api/ai/validate-answers', async (req, res) => {
     }
 
     try {
-        const model = getGeminiModel();
         const qList = questions.map((q: any, i: number) =>
             `Q${i + 1}: "${q.question}"\n  Founder's Expected Answer: "${q.correctAnswer}"\n  Victim's Answer: "${q.userAnswer}"`
         ).join('\n\n');
@@ -339,8 +357,7 @@ Respond ONLY with this JSON:
   "reason": "Brief explanation of your decision"
 }`;
 
-        const result = await model.generateContent(prompt);
-        let text = result.response.text().trim();
+        let text = await callGemini(prompt);
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
         const parsed = JSON.parse(text);
