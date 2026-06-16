@@ -38,6 +38,11 @@ export interface Complaint {
     reopenReason?: string;
     resolvedAt?: string;
     cashPrize?: string;
+    notifyRadius?: number;
+    targetCommunityId?: string;
+    targetOrganizationId?: string;
+    latitude?: number;
+    longitude?: number;
 }
 
 export interface Notification {

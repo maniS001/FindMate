@@ -18,6 +18,10 @@ export default function SearchResults() {
         description: string;
         contactInfo: string;
         imageUris: string;
+        cashPrize: string;
+        notifyRadius: string;
+        targetCommunityId: string;
+        targetOrganizationId: string;
     }>();
     const router = useRouter();
     const { colors } = useTheme();
@@ -69,6 +73,10 @@ export default function SearchResults() {
                 contactInfo: params.contactInfo,
                 imageUris: base64Images,
                 userId: user?.id,
+                cashPrize: params.cashPrize?.trim() || undefined,
+                notifyRadius: params.notifyRadius ? parseInt(params.notifyRadius) : undefined,
+                targetCommunityId: params.targetCommunityId || undefined,
+                targetOrganizationId: params.targetOrganizationId || undefined,
             });
             router.push({
                 pathname: '/success',
