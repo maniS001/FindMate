@@ -113,7 +113,7 @@ export default function EditComplaint() {
                     type: form.name + ' ' + form.category,
                     description: form.description,
                     location: form.location,
-                    date: date.toISOString().split('T')[0],
+                    // date excluded — AI should not flag dates
                 }),
             });
             const aiData = await aiRes.json();
