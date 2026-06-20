@@ -4,7 +4,7 @@ import {
     ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Users, UserPlus, X, Search, CheckCircle, XCircle } from 'lucide-react-native';
+import { Plus, Users, UserPlus, X, Search, CheckCircle, XCircle, Lock, Globe } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,12 +30,16 @@ export default function CommunitiesScreen() {
     const [creating, setCreating] = useState(false);
     const [newCommName, setNewCommName] = useState('');
     const [newCommDesc, setNewCommDesc] = useState('');
+    const [newCommScope, setNewCommScope] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
 
     // Add Member Modal
     const [memberModalVisible, setMemberModalVisible] = useState(false);
     const [selectedCommId, setSelectedCommId] = useState<string | null>(null);
     const [memberIdentifier, setMemberIdentifier] = useState('');
     const [addingMember, setAddingMember] = useState(false);
+
+    // Join request loading state per community
+    const [joiningId, setJoiningId] = useState<string | null>(null);
 
     useFocusEffect(
         useCallback(() => {
@@ -94,6 +98,7 @@ export default function CommunitiesScreen() {
     };
 
     const handleJoinRequest = async (commId: string) => {
+        setJoiningId(commId);
         try {
             const res = await fetch(`${API_URL}/communities/${commId}/join-request`, {
                 method: 'POST',
@@ -105,6 +110,8 @@ export default function CommunitiesScreen() {
             handleSearchCommunities();
         } catch (e: any) {
             showAlert('Error', e.message);
+        } finally {
+            setJoiningId(null);
         }
     };
 
@@ -135,7 +142,7 @@ export default function CommunitiesScreen() {
             const res = await fetch(`${API_URL}/communities`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ name: newCommName.trim(), description: newCommDesc.trim() })
+                body: JSON.stringify({ name: newCommName.trim(), description: newCommDesc.trim(), scope: newCommScope })
             });
             const text = await res.text();
             if (!res.ok) {
@@ -143,7 +150,7 @@ export default function CommunitiesScreen() {
                 try { msg = JSON.parse(text).error || msg; } catch {}
                 throw new Error(msg);
             }
-            setNewCommName(''); setNewCommDesc('');
+            setNewCommName(''); setNewCommDesc(''); setNewCommScope('PUBLIC');
             setCreateModalVisible(false);
             fetchMyComms();
             showAlert('Success', 'Community created successfully!');
@@ -180,12 +187,26 @@ export default function CommunitiesScreen() {
         const memberCount = item.members?.filter((m: any) => m.role !== 'PENDING').length || 0;
         const pendingCount = item.members?.filter((m: any) => m.role === 'PENDING').length || 0;
         const isAdmin = item.members?.some((m: any) => m.userId && m.role === 'ADMIN');
+        const isPrivate = item.scope === 'PRIVATE';
 
         return (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.cardHeader}>
                     <View style={{ flex: 1 }}>
-                        <Text style={[styles.commName, { color: colors.text }]}>{item.name}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={[styles.commName, { color: colors.text }]}>{item.name}</Text>
+                            {isPrivate ? (
+                                <View style={[styles.scopeBadge, { backgroundColor: colors.warning + '20' }]}>
+                                    <Lock size={10} color={colors.warning} />
+                                    <Text style={{ color: colors.warning, fontSize: 10, fontWeight: '700', marginLeft: 3 }}>Private</Text>
+                                </View>
+                            ) : (
+                                <View style={[styles.scopeBadge, { backgroundColor: colors.primary + '15' }]}>
+                                    <Globe size={10} color={colors.primary} />
+                                    <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700', marginLeft: 3 }}>Public</Text>
+                                </View>
+                            )}
+                        </View>
                         {item.organization && (
                             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                                 📁 {item.organization.name}
@@ -223,34 +244,46 @@ export default function CommunitiesScreen() {
     };
 
     const renderSearchResult = ({ item }: { item: any }) => {
-        const memberCount = item.members?.filter((m: any) => m.role !== 'PENDING').length || 0;
-        const isPending = item.members?.some((m: any) => m.role === 'PENDING');
-        const isMember = item.members?.some((m: any) => m.role === 'MEMBER' || m.role === 'ADMIN');
+        // Backend now only returns the CURRENT user's membership record in members[]
+        const myMembership = item.members?.[0]; // will be undefined if not a member
+        const isMember = myMembership?.role === 'MEMBER' || myMembership?.role === 'ADMIN';
+        const isPending = myMembership?.role === 'PENDING';
+        const memberCount = item._count?.members ?? (item.members?.filter((m: any) => m.role !== 'PENDING').length || 0);
+        const isJoining = joiningId === item.id;
 
         return (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Text style={[styles.commName, { color: colors.text }]}>{item.name}</Text>
                 {item.organization && <Text style={[styles.subtitle, { color: colors.textSecondary }]}>📁 {item.organization.name}</Text>}
                 {item.description ? <Text style={[styles.desc, { color: colors.textSecondary }]}>{item.description}</Text> : null}
-                <View style={[styles.statsRow, { marginTop: 8 }]}>
+
+                <View style={[styles.statsRow, { marginTop: 10 }]}>
+                    {/* Member count */}
                     <View style={[styles.statBadge, { backgroundColor: colors.background }]}>
                         <Users size={12} color={colors.textSecondary} />
                         <Text style={{ color: colors.textSecondary, fontSize: 12, marginLeft: 4 }}>{memberCount} members</Text>
                     </View>
+
+                    {/* Status / Action */}
                     {isMember ? (
                         <View style={[styles.statBadge, { backgroundColor: colors.success + '20' }]}>
-                            <Text style={{ color: colors.success, fontSize: 12, fontWeight: '600' }}>✓ Member</Text>
+                            <CheckCircle size={12} color={colors.success} />
+                            <Text style={{ color: colors.success, fontSize: 12, fontWeight: '700', marginLeft: 4 }}>Member</Text>
                         </View>
                     ) : isPending ? (
                         <View style={[styles.statBadge, { backgroundColor: colors.warning + '20' }]}>
-                            <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '600' }}>⏳ Requested</Text>
+                            <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '600' }}>⏳ Request Sent</Text>
                         </View>
                     ) : (
                         <TouchableOpacity
-                            style={[styles.statBadge, { backgroundColor: colors.primary }]}
+                            style={[styles.joinBtn, { backgroundColor: isJoining ? colors.primary + '80' : colors.primary }]}
                             onPress={() => handleJoinRequest(item.id)}
+                            disabled={isJoining}
                         >
-                            <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>Request to Join</Text>
+                            <UserPlus size={13} color="white" />
+                            <Text style={{ color: 'white', fontSize: 12, fontWeight: '700', marginLeft: 5 }}>
+                                {isJoining ? 'Sending...' : 'Request to Join'}
+                            </Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -329,10 +362,44 @@ export default function CommunitiesScreen() {
                                 value={newCommDesc}
                                 onChangeText={setNewCommDesc}
                                 returnKeyType="done"
-                                onSubmitEditing={handleCreate}
                             />
+
+                            {/* Scope selector */}
+                            <Text style={[styles.scopeLabel, { color: colors.text }]}>Community Visibility</Text>
+                            <View style={styles.scopeRow}>
+                                <TouchableOpacity
+                                    style={[styles.scopeOption, {
+                                        borderColor: newCommScope === 'PUBLIC' ? colors.primary : colors.border,
+                                        backgroundColor: newCommScope === 'PUBLIC' ? colors.primary + '12' : colors.background
+                                    }]}
+                                    onPress={() => setNewCommScope('PUBLIC')}
+                                >
+                                    <Globe size={18} color={newCommScope === 'PUBLIC' ? colors.primary : colors.textSecondary} />
+                                    <View style={{ marginLeft: 8, flex: 1 }}>
+                                        <Text style={{ color: newCommScope === 'PUBLIC' ? colors.primary : colors.text, fontWeight: '700', fontSize: 13 }}>Public</Text>
+                                        <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>Anyone can search & request to join</Text>
+                                    </View>
+                                    {newCommScope === 'PUBLIC' && <CheckCircle size={16} color={colors.primary} />}
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.scopeOption, {
+                                        borderColor: newCommScope === 'PRIVATE' ? colors.warning : colors.border,
+                                        backgroundColor: newCommScope === 'PRIVATE' ? colors.warning + '12' : colors.background
+                                    }]}
+                                    onPress={() => setNewCommScope('PRIVATE')}
+                                >
+                                    <Lock size={18} color={newCommScope === 'PRIVATE' ? colors.warning : colors.textSecondary} />
+                                    <View style={{ marginLeft: 8, flex: 1 }}>
+                                        <Text style={{ color: newCommScope === 'PRIVATE' ? colors.warning : colors.text, fontWeight: '700', fontSize: 13 }}>Private</Text>
+                                        <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>Invite-only, not visible in search</Text>
+                                    </View>
+                                    {newCommScope === 'PRIVATE' && <CheckCircle size={16} color={colors.warning} />}
+                                </TouchableOpacity>
+                            </View>
+
                             <View style={styles.btnRow}>
-                                <TouchableOpacity style={[styles.btn, { backgroundColor: colors.border, flex: 1 }]} onPress={() => { setCreateModalVisible(false); setNewCommName(''); setNewCommDesc(''); }}>
+                                <TouchableOpacity style={[styles.btn, { backgroundColor: colors.border, flex: 1 }]} onPress={() => { setCreateModalVisible(false); setNewCommName(''); setNewCommDesc(''); setNewCommScope('PUBLIC'); }}>
                                     <Text style={{ color: colors.text, textAlign: 'center' }}>Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]} onPress={handleCreate} disabled={creating}>
@@ -418,7 +485,7 @@ export default function CommunitiesScreen() {
                     <View style={[styles.searchBox, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
                         <TextInput
                             style={[styles.searchInput, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }]}
-                            placeholder="Search communities by name..."
+                            placeholder="Search public communities by name..."
                             placeholderTextColor={colors.textSecondary}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
@@ -441,7 +508,7 @@ export default function CommunitiesScreen() {
                             ListEmptyComponent={
                                 <View style={styles.empty}>
                                     <Search size={48} color={colors.textSecondary} />
-                                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Search for a community by name above</Text>
+                                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Search for a public community by name above</Text>
                                 </View>
                             }
                         />
@@ -495,13 +562,27 @@ const styles = StyleSheet.create({
     commName: { fontSize: 17, fontWeight: '700' },
     subtitle: { fontSize: 12, marginTop: 3 },
     desc: { fontSize: 13, marginTop: 6, lineHeight: 18 },
-    statsRow: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
+    statsRow: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' },
     statBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 10,
         paddingVertical: 5,
         borderRadius: 20,
+    },
+    joinBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        borderRadius: 20,
+    },
+    scopeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
     },
     iconBtn: { padding: 8, borderRadius: 10, marginLeft: 8 },
     actionBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
@@ -518,6 +599,9 @@ const styles = StyleSheet.create({
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
     modalTitle: { fontSize: 20, fontWeight: 'bold' },
     modalSub: { fontSize: 14, marginBottom: 16, lineHeight: 20 },
+    scopeLabel: { fontSize: 14, fontWeight: '600', marginBottom: 10 },
+    scopeRow: { gap: 10, marginBottom: 16 },
+    scopeOption: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1.5 },
     empty: { alignItems: 'center', paddingTop: 70, gap: 12 },
     emptyTitle: { fontSize: 18, fontWeight: '700' },
     emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 22 },

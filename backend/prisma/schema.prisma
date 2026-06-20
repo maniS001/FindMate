@@ -138,6 +138,7 @@ model Community {
   id             String        @id @default(uuid())
   name           String
   description    String?
+  scope          String        @default("PUBLIC") // PUBLIC = searchable by all, PRIVATE = invite-only
   createdAt      DateTime      @default(now())
   
   creatorId      String

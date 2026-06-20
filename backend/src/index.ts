@@ -1528,9 +1528,10 @@ app.get('/api/users/me/orgs', authenticateToken, async (req: any, res: any) => {
 // Create Community
 app.post('/api/communities', authenticateToken, async (req: any, res: any) => {
     try {
-        const { name, description, organizationId } = req.body;
+        const { name, description, organizationId, scope } = req.body;
+        const communityScope = (scope === 'PRIVATE') ? 'PRIVATE' : 'PUBLIC';
         const comm = await prisma.community.create({
-            data: { name, description, organizationId: organizationId || null, creatorId: req.user.id }
+            data: { name, description, organizationId: organizationId || null, creatorId: req.user.id, scope: communityScope }
         });
         await prisma.communityMember.create({
             data: { communityId: comm.id, userId: req.user.id, role: 'ADMIN' }
@@ -1648,15 +1649,41 @@ app.patch('/api/communities/:id/members/:userId', authenticateToken, async (req:
 });
 
 // Search Communities (public, for join)
-app.get('/api/communities/search', async (req: any, res: any) => {
+app.get('/api/communities/search', authenticateToken, async (req: any, res: any) => {
     try {
         const { q } = req.query;
+        const userId = req.user?.id;
         const comms = await prisma.community.findMany({
-            where: q ? { name: { contains: String(q), mode: 'insensitive' } } : {},
-            include: { members: true, organization: true },
+            where: {
+                scope: 'PUBLIC', // Only show PUBLIC communities in search
+                ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {})
+            },
+            include: {
+                organization: true,
+                members: {
+                    where: { userId }, // Only return the CURRENT user's membership record
+                    select: { role: true }
+                }
+            },
             take: 20
         });
-        res.json(comms);
+        // Reshape: add memberCount separately
+        const result = await prisma.community.findMany({
+            where: {
+                scope: 'PUBLIC',
+                ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {})
+            },
+            include: {
+                organization: true,
+                _count: { select: { members: { where: { role: { not: 'PENDING' } } } } },
+                members: {
+                    where: { userId },
+                    select: { role: true }
+                }
+            },
+            take: 20
+        });
+        res.json(result);
     } catch (e: any) {
         res.status(500).json({ error: e.message });
     }
