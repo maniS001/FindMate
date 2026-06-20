@@ -4,8 +4,8 @@ import {
     ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Users, UserPlus, X, Search, CheckCircle, XCircle, Lock, Globe } from 'lucide-react-native';
-import { useFocusEffect } from 'expo-router';
+import { Plus, Users, UserPlus, X, Search, CheckCircle, XCircle, Lock, Globe, ChevronRight } from 'lucide-react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../constants/api';
@@ -16,6 +16,7 @@ type TabType = 'MY' | 'JOIN' | 'REQUESTS';
 export default function CommunitiesScreen() {
     const { colors } = useTheme();
     const { token } = useAuth();
+    const router = useRouter();
 
     const [activeTab, setActiveTab] = useState<TabType>('MY');
     const [myComms, setMyComms] = useState<any[]>([]);
@@ -190,7 +191,11 @@ export default function CommunitiesScreen() {
         const isPrivate = item.scope === 'PRIVATE';
 
         return (
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <TouchableOpacity
+                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                onPress={() => router.push(`/account/community/${item.id}`)}
+                activeOpacity={0.85}
+            >
                 <View style={styles.cardHeader}>
                     <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -238,8 +243,10 @@ export default function CommunitiesScreen() {
                             <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '600' }}>⏳ {pendingCount} pending</Text>
                         </TouchableOpacity>
                     )}
+                    <View style={{ flex: 1 }} />
+                    <ChevronRight size={16} color={colors.textSecondary} />
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
 

@@ -1525,6 +1525,75 @@ app.get('/api/users/me/orgs', authenticateToken, async (req: any, res: any) => {
     }
 });
 
+// Get Community Detail with full member list
+app.get('/api/communities/:id', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { id } = req.params;
+        const comm = await prisma.community.findUnique({
+            where: { id },
+            include: {
+                organization: true,
+                members: {
+                    where: { role: { not: 'PENDING' } },
+                    include: {
+                        user: { select: { id: true, name: true, email: true } }
+                    },
+                    orderBy: { createdAt: 'asc' }
+                }
+            }
+        });
+        if (!comm) return res.status(404).json({ error: 'Community not found' });
+        // Check if requester is a member (non-pending)
+        const isMember = comm.members.some((m: any) => m.userId === req.user.id);
+        if (!isMember) return res.status(403).json({ error: 'You are not a member of this community' });
+        res.json(comm);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Remove member from community (admin) OR leave community (self)
+app.delete('/api/communities/:id/members/:userId', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { id, userId } = req.params;
+        const requesterId = req.user.id;
+
+        const requesterMembership = await prisma.communityMember.findFirst({
+            where: { communityId: id, userId: requesterId }
+        });
+
+        const isAdmin = requesterMembership?.role === 'ADMIN';
+        const isSelf = requesterId === userId;
+
+        if (!isSelf && !isAdmin) {
+            return res.status(403).json({ error: 'Only admins can remove other members' });
+        }
+
+        // Prevent admin from leaving without transferring ownership
+        if (isSelf && isAdmin) {
+            const otherMembers = await prisma.communityMember.findMany({
+                where: { communityId: id, role: { not: 'PENDING' }, userId: { not: requesterId } }
+            });
+            if (otherMembers.length > 0) {
+                // Promote the oldest other member to admin
+                await prisma.communityMember.update({
+                    where: { id: otherMembers[0].id },
+                    data: { role: 'ADMIN' }
+                });
+            }
+            // If no other members, community will be empty — allow leaving
+        }
+
+        await prisma.communityMember.deleteMany({
+            where: { communityId: id, userId }
+        });
+
+        res.json({ message: isSelf ? 'You have left the community' : 'Member removed' });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Create Community
 app.post('/api/communities', authenticateToken, async (req: any, res: any) => {
     try {
