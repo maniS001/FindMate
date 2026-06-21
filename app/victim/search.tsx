@@ -109,10 +109,11 @@ export default function SearchLostItem() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    type: form.name + ' ' + form.category,
+                    name: form.name,
+                    category: form.category,
                     description: form.description,
                     location: form.location,
-                    // date excluded — DatePicker enforces max=today, AI should not re-check it
+                    date: date.toISOString().split('T')[0]
                 }),
             });
             const aiData = await aiRes.json();
