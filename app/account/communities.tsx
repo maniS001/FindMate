@@ -251,11 +251,11 @@ export default function CommunitiesScreen() {
     };
 
     const renderSearchResult = ({ item }: { item: any }) => {
-        // Backend now only returns the CURRENT user's membership record in members[]
-        const myMembership = item.members?.[0]; // will be undefined if not a member
-        const isMember = myMembership?.role === 'MEMBER' || myMembership?.role === 'ADMIN';
-        const isPending = myMembership?.role === 'PENDING';
-        const memberCount = item._count?.members ?? (item.members?.filter((m: any) => m.role !== 'PENDING').length || 0);
+        // Backend now sends myRole (null = not a member) and memberCount
+        const myRole: string | null = item.myRole ?? item.members?.[0]?.role ?? null;
+        const isMember = myRole === 'MEMBER' || myRole === 'ADMIN';
+        const isPending = myRole === 'PENDING';
+        const memberCount = item.memberCount ?? item._count?.members ?? 0;
         const isJoining = joiningId === item.id;
 
         return (
