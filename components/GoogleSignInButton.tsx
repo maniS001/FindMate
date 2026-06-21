@@ -5,7 +5,7 @@ import {
 } from '@react-native-google-signin/google-signin';
 import * as Location from 'expo-location';
 import React, { useEffect } from 'react';
-import { Alert, PermissionsAndroid, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, PermissionsAndroid, Platform, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { LocationInputModal } from './LocationInputModal';
 
 // Hardcoded Web Client ID
@@ -22,20 +22,22 @@ if (Platform.OS !== 'web') {
 interface GoogleSignInButtonProps {
     onSignInSuccess: (userInfo: any) => void;
     onSignInFailure?: (error: any) => void;
+    disabled?: boolean;
 }
 
 export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
     onSignInSuccess,
     onSignInFailure,
+    disabled = false,
 }) => {
     // State for web script loading
     const [scriptLoaded, setScriptLoaded] = React.useState(false);
     // Ref for the Google Button wrapper on Web
     const googleButtonRef = React.useRef<HTMLDivElement>(null);
 
-    // State for manual location modal
     const [showLocationModal, setShowLocationModal] = React.useState(false);
     const [pendingUserInfo, setPendingUserInfo] = React.useState<any>(null);
+    const [isProcessing, setIsProcessing] = React.useState(false);
 
     const handleManualLocation = (location: string | null) => {
         setShowLocationModal(false);
@@ -241,6 +243,8 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
     };
 
     const signInNative = async () => {
+        if (disabled || isProcessing) return;
+        setIsProcessing(true);
         try {
             await GoogleSignin.hasPlayServices();
             
@@ -280,6 +284,8 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
                 if (onSignInFailure) onSignInFailure(error);
                 else Alert.alert('Error', 'Google Sign-In failed');
             }
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -317,13 +323,20 @@ export const GoogleSignInBtn: React.FC<GoogleSignInButtonProps> = ({
     return (
         <>
             <TouchableOpacity
-                style={styles.customGoogleButton}
+                style={[styles.customGoogleButton, (disabled || isProcessing) && { opacity: 0.7 }]}
                 onPress={signInNative}
+                disabled={disabled || isProcessing}
             >
-                <View style={styles.iconContainer}>
-                    <Text style={styles.googleIconText}>G</Text>
-                </View>
-                <Text style={styles.googleButtonText}>Sign in with Google</Text>
+                {isProcessing ? (
+                    <ActivityIndicator color="#4285F4" size="small" />
+                ) : (
+                    <>
+                        <View style={styles.iconContainer}>
+                            <Text style={styles.googleIconText}>G</Text>
+                        </View>
+                        <Text style={styles.googleButtonText}>Sign in with Google</Text>
+                    </>
+                )}
             </TouchableOpacity>
             <LocationInputModal
                 visible={showLocationModal}

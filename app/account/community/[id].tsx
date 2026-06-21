@@ -4,7 +4,6 @@ import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
     ActivityIndicator, Alert, RefreshControl
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Crown, UserMinus, LogOut, Users, Globe, Lock, Shield } from 'lucide-react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -157,9 +156,9 @@ export default function CommunityDetailScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
                 <ActivityIndicator style={{ marginTop: 80 }} size="large" color={colors.primary} />
-            </SafeAreaView>
+            </View>
         );
     }
 
@@ -167,12 +166,9 @@ export default function CommunityDetailScreen() {
     const isPrivate = community?.scope === 'PRIVATE';
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Header */}
             <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-                    <ArrowLeft size={22} color={colors.text} />
-                </TouchableOpacity>
                 <View style={{ flex: 1 }}>
                     <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{community?.name}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
@@ -220,7 +216,7 @@ export default function CommunityDetailScreen() {
                     </View>
                 }
             />
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -234,8 +230,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         gap: 12,
     },
-    backBtn: { padding: 4 },
-    title: { fontSize: 18, fontWeight: '700' },
+    title: { fontSize: 20, fontWeight: '700' },
     adminBadge: {
         flexDirection: 'row',
         alignItems: 'center',

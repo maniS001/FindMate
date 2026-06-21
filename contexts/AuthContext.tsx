@@ -55,7 +55,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(newUser);
         await AsyncStorage.setItem('token', newToken);
         await AsyncStorage.setItem('user', JSON.stringify(newUser));
-        router.replace('/');
     };
 
     const logout = async () => {
@@ -63,7 +62,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         await AsyncStorage.removeItem('token');
         await AsyncStorage.removeItem('user');
-        router.replace('/auth/login');
     };
 
     const signup = async (name: string, email: string, password: string) => {

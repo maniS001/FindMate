@@ -17,6 +17,7 @@ interface ThemeContextType {
         card: string;
         error: string;
         success: string;
+        warning: string;
         headerBackground: string;
         headerText: string;
     };
@@ -33,6 +34,7 @@ const lightColors = {
     card: '#FFFFFF',
     error: '#EF4444',
     success: '#10B981',
+    warning: '#F59E0B',
     headerBackground: '#3B82F6',
     headerText: '#FFFFFF',
 };
@@ -48,6 +50,7 @@ const darkColors = {
     card: '#1E293B',
     error: '#F87171',
     success: '#34D399',
+    warning: '#FBBF24',
     headerBackground: '#1E293B',
     headerText: '#F1F5F9',
 };

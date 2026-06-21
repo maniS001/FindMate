@@ -17,7 +17,7 @@ import { showAlert } from '../../utils/alert';
 export default function ReportFoundItem() {
     const router = useRouter();
     const { colors } = useTheme();
-    const { user } = useAuth();
+    const { user, token } = useAuth();
     const [loading, setLoading] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
     const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
@@ -31,8 +31,8 @@ export default function ReportFoundItem() {
     const [targetOrganizationId, setTargetOrganizationId] = useState('');
 
     useEffect(() => {
-        if (user) {
-            fetch(`${API_URL}/users/me/communities`, { headers: { Authorization: `Bearer ${user.token || ''}` }})
+        if (token) {
+            fetch(`${API_URL}/users/me/communities`, { headers: { Authorization: `Bearer ${token}` }})
                 .then(async r => {
                     if (!r.ok) throw new Error('Failed to fetch communities');
                     const text = await r.text();
@@ -41,7 +41,7 @@ export default function ReportFoundItem() {
                 .then(setComms)
                 .catch(e => console.log('Communities fetch error:', e.message));
 
-            fetch(`${API_URL}/users/me/orgs`, { headers: { Authorization: `Bearer ${user.token || ''}` }})
+            fetch(`${API_URL}/users/me/orgs`, { headers: { Authorization: `Bearer ${token}` }})
                 .then(async r => {
                     if (!r.ok) throw new Error('Failed to fetch orgs');
                     const text = await r.text();
@@ -225,56 +225,98 @@ export default function ReportFoundItem() {
                             initialImages={form.imageUris}
                         />
 
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, marginTop: 16 }}>Notification Target</Text>
-                        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                            <TouchableOpacity onPress={() => setNotificationType('RADIUS')} style={{ padding: 8, borderWidth: 1, borderColor: notificationType === 'RADIUS' ? colors.primary : colors.border, borderRadius: 8, backgroundColor: notificationType === 'RADIUS' ? colors.primary + '10' : 'transparent' }}>
-                                <Text style={{ color: colors.text }}>Radius</Text>
-                            </TouchableOpacity>
-                            {comms.length > 0 && (
-                                <TouchableOpacity onPress={() => setNotificationType('COMMUNITY')} style={{ padding: 8, borderWidth: 1, borderColor: notificationType === 'COMMUNITY' ? colors.primary : colors.border, borderRadius: 8, backgroundColor: notificationType === 'COMMUNITY' ? colors.primary + '10' : 'transparent' }}>
-                                    <Text style={{ color: colors.text }}>Community</Text>
+                        {/* Notification Target Section */}
+                        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={{ fontSize: 18 }}>📢</Text>
+                                <View style={{ marginLeft: 10, flex: 1 }}>
+                                    <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Who to Notify</Text>
+                                    <Text style={[styles.sectionDesc, { color: colors.textSecondary, marginBottom: 0 }]}>
+                                        Choose who gets an alert about this item
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Type Selector */}
+                            <View style={styles.notifyTypeRow}>
+                                <TouchableOpacity
+                                    style={[styles.notifyTypeBtn, { borderColor: notificationType === 'RADIUS' ? colors.primary : colors.border, backgroundColor: notificationType === 'RADIUS' ? colors.primary + '15' : 'transparent' }]}
+                                    onPress={() => setNotificationType('RADIUS')}
+                                >
+                                    <Text style={{ fontSize: 18 }}>📍</Text>
+                                    <Text style={[styles.notifyTypeTxt, { color: notificationType === 'RADIUS' ? colors.primary : colors.text }]}>Nearby</Text>
                                 </TouchableOpacity>
+
+                                {comms.length > 0 && (
+                                    <TouchableOpacity
+                                        style={[styles.notifyTypeBtn, { borderColor: notificationType === 'COMMUNITY' ? colors.primary : colors.border, backgroundColor: notificationType === 'COMMUNITY' ? colors.primary + '15' : 'transparent' }]}
+                                        onPress={() => setNotificationType('COMMUNITY')}
+                                    >
+                                        <Text style={{ fontSize: 18 }}>👥</Text>
+                                        <Text style={[styles.notifyTypeTxt, { color: notificationType === 'COMMUNITY' ? colors.primary : colors.text }]}>Community</Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {orgs.length > 0 && (
+                                    <TouchableOpacity
+                                        style={[styles.notifyTypeBtn, { borderColor: notificationType === 'ORGANIZATION' ? colors.primary : colors.border, backgroundColor: notificationType === 'ORGANIZATION' ? colors.primary + '15' : 'transparent' }]}
+                                        onPress={() => setNotificationType('ORGANIZATION')}
+                                    >
+                                        <Text style={{ fontSize: 18 }}>🏢</Text>
+                                        <Text style={[styles.notifyTypeTxt, { color: notificationType === 'ORGANIZATION' ? colors.primary : colors.text }]}>Organization</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            {/* Radius Selector */}
+                            {notificationType === 'RADIUS' && (
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>
+                                        Notify people within this radius of your current GPS location:
+                                    </Text>
+                                    <Input
+                                        placeholder="Radius in km (e.g. 5)"
+                                        value={notifyRadius}
+                                        onChangeText={setNotifyRadius}
+                                        keyboardType="number-pad"
+                                    />
+                                </View>
                             )}
-                            {orgs.length > 0 && (
-                                <TouchableOpacity onPress={() => setNotificationType('ORGANIZATION')} style={{ padding: 8, borderWidth: 1, borderColor: notificationType === 'ORGANIZATION' ? colors.primary : colors.border, borderRadius: 8, backgroundColor: notificationType === 'ORGANIZATION' ? colors.primary + '10' : 'transparent' }}>
-                                    <Text style={{ color: colors.text }}>Organization</Text>
-                                </TouchableOpacity>
+
+                            {/* Community Selector */}
+                            {notificationType === 'COMMUNITY' && (
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>Select community to notify:</Text>
+                                    {comms.map(c => (
+                                        <TouchableOpacity
+                                            key={c.id}
+                                            style={[styles.selectItem, { borderColor: targetCommunityId === c.id ? colors.primary : colors.border, backgroundColor: targetCommunityId === c.id ? colors.primary + '15' : colors.surface }]}
+                                            onPress={() => setTargetCommunityId(c.id)}
+                                        >
+                                            <Text style={[{ flex: 1, fontSize: 14, fontWeight: '500' }, { color: targetCommunityId === c.id ? colors.primary : colors.text }]}>{c.name}</Text>
+                                            {targetCommunityId === c.id && <Text style={{ color: colors.primary }}>✓</Text>}
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Org Selector */}
+                            {notificationType === 'ORGANIZATION' && (
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>Select organization to notify:</Text>
+                                    {orgs.map(o => (
+                                        <TouchableOpacity
+                                            key={o.id}
+                                            style={[styles.selectItem, { borderColor: targetOrganizationId === o.id ? colors.primary : colors.border, backgroundColor: targetOrganizationId === o.id ? colors.primary + '15' : colors.surface }]}
+                                            onPress={() => setTargetOrganizationId(o.id)}
+                                        >
+                                            <Text style={[{ flex: 1, fontSize: 14, fontWeight: '500' }, { color: targetOrganizationId === o.id ? colors.primary : colors.text }]}>{o.name}</Text>
+                                            {targetOrganizationId === o.id && <Text style={{ color: colors.primary }}>✓</Text>}
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
                             )}
                         </View>
-
-                        {notificationType === 'RADIUS' && (
-                            <Input
-                                label="Radius (km)"
-                                placeholder="1 to 10"
-                                value={notifyRadius}
-                                onChangeText={setNotifyRadius}
-                                keyboardType="number-pad"
-                            />
-                        )}
-
-                        {notificationType === 'COMMUNITY' && (
-                            <View style={{ marginTop: 8 }}>
-                                <Text style={{ color: colors.textSecondary, marginBottom: 4 }}>Select Community ID (or name exactly):</Text>
-                                <Input
-                                    placeholder="Enter Community ID"
-                                    value={targetCommunityId}
-                                    onChangeText={setTargetCommunityId}
-                                />
-                                {comms.map(c => <Text key={c.id} style={{color: colors.primary, fontSize: 12}} onPress={() => setTargetCommunityId(c.id)}>{c.name} (Tap to select)</Text>)}
-                            </View>
-                        )}
-
-                        {notificationType === 'ORGANIZATION' && (
-                            <View style={{ marginTop: 8 }}>
-                                <Text style={{ color: colors.textSecondary, marginBottom: 4 }}>Select Organization ID:</Text>
-                                <Input
-                                    placeholder="Enter Org ID"
-                                    value={targetOrganizationId}
-                                    onChangeText={setTargetOrganizationId}
-                                />
-                                {orgs.map(o => <Text key={o.id} style={{color: colors.primary, fontSize: 12}} onPress={() => setTargetOrganizationId(o.id)}>{o.name} (Tap to select)</Text>)}
-                            </View>
-                        )}
 
                         <Input
                             label="Item Name"
@@ -452,5 +494,42 @@ const styles = StyleSheet.create({
         color: '#B91C1C',
         fontSize: 13,
         lineHeight: 20,
+    },
+    sectionCard: {
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        marginBottom: 8,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    notifyTypeRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 16,
+    },
+    notifyTypeBtn: {
+        flex: 1,
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1.5,
+        gap: 4,
+    },
+    notifyTypeTxt: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    selectItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        marginBottom: 6,
+        gap: 10,
     },
 });

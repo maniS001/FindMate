@@ -889,6 +889,23 @@ app.post('/api/complaints', async (req, res) => {
 // List Items (with search)
 app.get('/api/items', async (req, res) => {
     try {
+        let currentUser: any = null;
+        const authHeader = req.headers['authorization'];
+        if (authHeader) {
+            const token = authHeader.split(' ')[1];
+            if (token) {
+                try {
+                    const decoded = jwt.verify(token, JWT_SECRET) as any;
+                    currentUser = await prisma.user.findUnique({
+                        where: { id: decoded.id },
+                        include: { memberships: true, orgAdmins: true }
+                    });
+                } catch (e) {
+                    // Ignore, continue as guest
+                }
+            }
+        }
+
         const { query, claimedBy, excludeClaimed, communityId, orgId, lat, lng, radius } = req.query;
         let where: any = {};
 
@@ -918,6 +935,34 @@ app.get('/api/items', async (req, res) => {
             where,
             orderBy: { createdAt: 'desc' },
             include: { questions: true },
+        });
+
+        items = items.filter(item => {
+            // Founder's Community constraint
+            if (item.targetCommunityId) {
+                if (!currentUser) return false;
+                const isMember = currentUser.memberships.some((m: any) => 
+                    m.communityId === item.targetCommunityId && 
+                    (m.role === 'MEMBER' || m.role === 'ADMIN')
+                );
+                if (!isMember) return false;
+            }
+            
+            // Founder's Organization constraint
+            if (item.targetOrganizationId) {
+                if (!currentUser) return false;
+                const isAdmin = currentUser.orgAdmins.some((o: any) => o.organizationId === item.targetOrganizationId);
+                if (!isAdmin) return false;
+            }
+
+            // Founder's Radius constraint
+            if (item.notifyRadius && item.latitude && item.longitude && !item.targetCommunityId && !item.targetOrganizationId) {
+                if (!currentUser || !currentUser.latitude || !currentUser.longitude) return false;
+                const distance = calculateDistance(item.latitude, item.longitude, currentUser.latitude, currentUser.longitude);
+                if (distance > item.notifyRadius) return false;
+            }
+
+            return true;
         });
 
         // Apply radius filter if provided and not filtering by community/org
@@ -1028,16 +1073,19 @@ app.get('/api/complaints/:id', async (req, res) => {
 app.patch('/api/items/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, name, category, location, date, description, contactInfo, imageUris, questions } = req.body;
+        const { status, name, category, location, date, description, contactInfo, imageUris, questions, notifyRadius, targetCommunityId, targetOrganizationId } = req.body;
 
         const data: any = {};
-        if (status) data.status = status;
-        if (name) data.name = name;
-        if (category) data.category = category;
-        if (location) data.location = location;
-        if (date) data.date = date;
-        if (description) data.description = description;
-        if (contactInfo) data.contactInfo = contactInfo;
+        if (status !== undefined) data.status = status;
+        if (name !== undefined) data.name = name;
+        if (category !== undefined) data.category = category;
+        if (location !== undefined) data.location = location;
+        if (date !== undefined) data.date = date;
+        if (description !== undefined) data.description = description;
+        if (contactInfo !== undefined) data.contactInfo = contactInfo;
+        if (notifyRadius !== undefined) data.notifyRadius = notifyRadius;
+        if (targetCommunityId !== undefined) data.targetCommunityId = targetCommunityId;
+        if (targetOrganizationId !== undefined) data.targetOrganizationId = targetOrganizationId;
 
         // Handle images array
         if (imageUris) {
@@ -1072,7 +1120,7 @@ app.patch('/api/items/:id', async (req, res) => {
 app.patch('/api/complaints/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, closureReason, reopenReason, resolvedAt, name, category, location, date, description, contactInfo, imageUris } = req.body;
+        const { status, closureReason, reopenReason, resolvedAt, name, category, location, date, description, contactInfo, imageUris, notifyRadius, targetCommunityId, targetOrganizationId } = req.body;
 
         // Get the current complaint to check if status is changing
         const currentComplaint = await prisma.complaint.findUnique({ where: { id } });
@@ -1088,13 +1136,16 @@ app.patch('/api/complaints/:id', async (req, res) => {
         if (resolvedAt) data.resolvedAt = resolvedAt;
 
         // Allow updating content fields
-        if (name) data.name = name;
-        if (category) data.category = category;
-        if (location) data.location = location;
-        if (date) data.date = date;
-        if (description) data.description = description;
-        if (contactInfo) data.contactInfo = contactInfo;
-        if (imageUris) data.imageUris = typeof imageUris === 'string' ? imageUris : JSON.stringify(imageUris);
+        if (name !== undefined) data.name = name;
+        if (category !== undefined) data.category = category;
+        if (location !== undefined) data.location = location;
+        if (date !== undefined) data.date = date;
+        if (description !== undefined) data.description = description;
+        if (contactInfo !== undefined) data.contactInfo = contactInfo;
+        if (notifyRadius !== undefined) data.notifyRadius = notifyRadius;
+        if (targetCommunityId !== undefined) data.targetCommunityId = targetCommunityId;
+        if (targetOrganizationId !== undefined) data.targetOrganizationId = targetOrganizationId;
+        if (imageUris !== undefined) data.imageUris = typeof imageUris === 'string' ? imageUris : JSON.stringify(imageUris);
 
         const complaint = await prisma.complaint.update({
             where: { id },

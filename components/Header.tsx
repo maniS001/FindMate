@@ -13,7 +13,7 @@ interface MenuItem {
     route: string;
 }
 
-export default function Header() {
+export default function Header({ forceShow = false }: { forceShow?: boolean } = {}) {
     const router = useRouter();
     const pathname = usePathname();
     const { colors } = useTheme();
@@ -59,8 +59,8 @@ export default function Header() {
         }
     };
 
-    const hideHeaderRoutes = ['/auth/signup', '/account', '/settings', '/about', '/notifications', '/success'];
-    if (hideHeaderRoutes.includes(pathname)) return null;
+    const hideHeaderRoutes = ['/auth/signup', '/account', '/settings', '/about', '/notifications', '/success', '/founder/complaints'];
+    if (!forceShow && hideHeaderRoutes.includes(pathname)) return null;
 
     return (
         <SafeAreaView edges={['top']} style={{ backgroundColor: colors.headerBackground }}>

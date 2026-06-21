@@ -3,7 +3,6 @@ import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
     ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, Users, UserPlus, X, Search, CheckCircle, XCircle, Lock, Globe, ChevronRight } from 'lucide-react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -326,7 +325,7 @@ export default function CommunitiesScreen() {
     );
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
 
             {/* Tabs */}
             <View style={[styles.tabBar, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
@@ -543,7 +542,7 @@ export default function CommunitiesScreen() {
                     }
                 />
             )}
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -562,7 +561,7 @@ const styles = StyleSheet.create({
         borderBottomColor: 'transparent',
     },
     tabText: { fontSize: 13, fontWeight: '600' },
-    list: { padding: 16, paddingBottom: 100 },
+    list: { padding: 16, paddingBottom: 160 },
     card: {
         padding: 16,
         borderRadius: 14,

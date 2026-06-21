@@ -137,6 +137,7 @@ export default function Login() {
                         <GoogleSignInBtn
                             onSignInSuccess={handleGoogleLogin}
                             onSignInFailure={(e) => setError(e.message || 'Google Sign-In failed')}
+                            disabled={loading}
                         />
 
                         <View style={styles.footer}>

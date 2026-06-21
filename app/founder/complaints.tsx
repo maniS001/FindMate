@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import { Calendar, MapPin, Search, SlidersHorizontal, X } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useState, useRef } from 'react';
+import { Animated, ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Header from '../../components/Header';
 import Card from '../../components/Card';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +19,23 @@ export default function ViewComplaints() {
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+
+    const insets = useSafeAreaInsets();
+    const HEADER_HEIGHT = insets.top + 65;
+    const SCROLL_DISTANCE = 65; // Only translate by 65px so search bar stops below status bar
+    const [searchHeight, setSearchHeight] = useState(100);
+
+    const scrollY = useRef(new Animated.Value(0)).current;
+    const translateY = Animated.diffClamp(scrollY, 0, SCROLL_DISTANCE).interpolate({
+        inputRange: [0, SCROLL_DISTANCE],
+        outputRange: [0, -SCROLL_DISTANCE],
+        extrapolate: 'clamp',
+    });
+    const headerOpacity = translateY.interpolate({
+        inputRange: [-SCROLL_DISTANCE, 0],
+        outputRange: [0, 1],
+        extrapolate: 'clamp',
+    });
 
     // Filter state
     const [showFilters, setShowFilters] = useState(false);
@@ -160,41 +178,48 @@ export default function ViewComplaints() {
     };
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
-
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={{ flex: 1 }}
-                keyboardVerticalOffset={0}
             >
-                <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-                    <View style={styles.searchRow}>
-                        <TextInput
-                            style={[styles.searchInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                            placeholder="Search by name, location, or category..."
-                            placeholderTextColor={colors.textSecondary}
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            onSubmitEditing={handleSearch}
-                        />
-                        <TouchableOpacity onPress={handleSearch} style={[styles.searchButton, { backgroundColor: colors.primary }]} activeOpacity={0.7}>
-                            <Search size={20} color="#FFFFFF" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => setShowFilters(!showFilters)}
-                            style={[styles.searchButton, { backgroundColor: showFilters ? colors.primary : colors.surface, borderWidth: 1, borderColor: colors.border }]}
-                        >
-                            <SlidersHorizontal size={20} color={showFilters ? '#fff' : colors.text} />
-                        </TouchableOpacity>
-                    </View>
+                {/* Fixed Status Bar Background */}
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: colors.headerBackground, zIndex: 30 }} />
 
-                    {/* Active Filter Pill */}
-                    <View style={styles.filterPillRow}>
-                        <View style={[styles.filterPill, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
-                            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>{activeFilterLabel()}</Text>
+                {/* Animated Topbar */}
+                <Animated.View style={{ transform: [{ translateY }], position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20 }}>
+                    <Header forceShow />
+                </Animated.View>
+
+                {/* Animated Search Container */}
+                <Animated.View 
+                    onLayout={(e) => setSearchHeight(e.nativeEvent.layout.height)}
+                    style={{ transform: [{ translateY }], position: 'absolute', top: HEADER_HEIGHT, left: 0, right: 0, zIndex: 10, elevation: 10 }}
+                >
+                    <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+                        <View style={styles.searchRow}>
+                            <TextInput
+                                style={[styles.searchInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                                placeholder=" Search complaint"
+                                placeholderTextColor={colors.textSecondary}
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                                onSubmitEditing={handleSearch}
+                            />
                         </View>
-                        <Text style={[styles.searchHint, { color: colors.textSecondary }]}>Find complaints matching the item you found</Text>
-                    </View>
+
+                        {/* Active Filter Pill & Filter Button */}
+                        <View style={styles.filterPillRow}>
+                            <TouchableOpacity
+                                onPress={() => setShowFilters(!showFilters)}
+                                style={[styles.smallFilterBtn, { borderColor: colors.border, backgroundColor: showFilters ? colors.primary + '15' : colors.surface }]}
+                            >
+                                <SlidersHorizontal size={14} color={showFilters ? colors.primary : colors.text} />
+                            </TouchableOpacity>
+                            <View style={[styles.filterPill, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+                                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>{activeFilterLabel()}</Text>
+                            </View>
+                        </View>
 
                     {/* Expanded Filter Panel */}
                     {showFilters && (
@@ -287,23 +312,28 @@ export default function ViewComplaints() {
                             </TouchableOpacity>
                         </View>
                     )}
-                </View>
+                    </View>
+                </Animated.View>
 
                 {loading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={colors.primary} />
-                        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading complaints...</Text>
                     </View>
                 ) : (
-                    <FlatList
+                    <Animated.FlatList
                         data={complaints}
                         renderItem={renderItem}
                         keyExtractor={item => item.id}
                         key={numColumns}
                         numColumns={numColumns}
-                        contentContainerStyle={styles.list}
+                        contentContainerStyle={[styles.list, { paddingTop: HEADER_HEIGHT + searchHeight + 16, paddingBottom: 100 }]}
                         columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
                         keyboardShouldPersistTaps="handled"
+                        onScroll={Animated.event(
+                            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                            { useNativeDriver: true }
+                        )}
+                        scrollEventThrottle={16}
                         ListEmptyComponent={
                             <View style={styles.empty}>
                                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
@@ -317,20 +347,19 @@ export default function ViewComplaints() {
                     />
                 )}
 
-                <View style={[styles.bottomAction, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-                    <Text style={[styles.actionText, { color: colors.text }]}>
-                        Didn't find a matching complaint?
-                    </Text>
-                    <TouchableOpacity
-                        style={[styles.reportButton, { backgroundColor: colors.primary }]}
-                        onPress={() => router.push('/founder/report')}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.reportButtonText}>Report New Item</Text>
-                    </TouchableOpacity>
+                <View style={[styles.bottomAction, { backgroundColor: colors.surface, borderBottomColor: colors.border, borderTopWidth: 1, position: 'absolute', bottom: 0, left: 0, right: 0 }]}>
+                    <SafeAreaView edges={['bottom']} style={{ width: '100%' }}>
+                        <TouchableOpacity
+                            style={[styles.reportButton, { backgroundColor: colors.primary }]}
+                            onPress={() => router.push('/founder/report')}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.reportButtonText}>Report New Item</Text>
+                        </TouchableOpacity>
+                    </SafeAreaView>
                 </View>
             </KeyboardAvoidingView>
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -352,9 +381,11 @@ const styles = StyleSheet.create({
         lineHeight: 24,
     },
     searchContainer: {
-        padding: 16,
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 10,
         borderBottomWidth: 1,
-        gap: 8,
+        gap: 6,
     },
     searchRow: {
         flexDirection: 'row',
@@ -386,6 +417,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 8,
         flexWrap: 'wrap',
+    },
+    smallFilterBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        borderWidth: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     filterPill: {
         paddingHorizontal: 10,
@@ -513,7 +552,9 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     bottomAction: {
-        padding: 24,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 8,
         borderTopWidth: 1,
         alignItems: 'center',
         gap: 16,

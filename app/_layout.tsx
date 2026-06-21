@@ -24,7 +24,6 @@ Notifications.setNotificationHandler({
 function RootLayoutContent() {
   const { theme, colors } = useTheme();
   const pathname = usePathname();
-  const shouldHideHeader = pathname === '/auth/login';
 
   const [expoPushToken, setExpoPushToken] = useState('');
   const [notification, setNotification] = useState<Notifications.Notification | undefined>(undefined);
@@ -70,28 +69,28 @@ function RootLayoutContent() {
     <NavigationThemeProvider value={navigationTheme}>
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: colors.background }}>
-          {!shouldHideHeader && <Header />}
           <WebContainer>
-
             <Stack
               screenOptions={{
-                headerShown: false,
+                headerShown: true,
+                header: () => <Header forceShow />,
                 contentStyle: { backgroundColor: colors.background }
               }}
             >
               <Stack.Screen name="index" />
-              <Stack.Screen name="auth/login" />
-              <Stack.Screen name="auth/signup" />
+              <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+              <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
               <Stack.Screen name="victim/search" />
               <Stack.Screen name="victim/results" />
               <Stack.Screen name="victim/claim/[id]" />
               <Stack.Screen name="founder/report" />
-              <Stack.Screen name="founder/complaints" />
+              <Stack.Screen name="founder/complaints" options={{ headerShown: false }} />
               <Stack.Screen name="founder/complaint-detail" />
-              <Stack.Screen name="success" />
-              <Stack.Screen name="account" />
-              <Stack.Screen name="settings" />
-              <Stack.Screen name="about" />
+              <Stack.Screen name="success" options={{ headerShown: false }} />
+              <Stack.Screen name="account" options={{ headerShown: false }} />
+              <Stack.Screen name="settings" options={{ headerShown: false }} />
+              <Stack.Screen name="about" options={{ headerShown: false }} />
+              <Stack.Screen name="notifications" options={{ headerShown: false }} />
             </Stack>
           </WebContainer>
         </View>

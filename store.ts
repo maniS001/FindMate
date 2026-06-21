@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from './constants/api';
 
 // API Configuration is now managed in constants/api.ts
@@ -100,7 +101,9 @@ export const getItems = async (): Promise<Item[]> => {
 
 export const searchItems = async (query: string): Promise<Item[]> => {
     try {
-        const response = await fetch(`${API_URL}/items?query=${encodeURIComponent(query)}&excludeClaimed=true`);
+        const token = await AsyncStorage.getItem('token');
+        const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch(`${API_URL}/items?query=${encodeURIComponent(query)}&excludeClaimed=true`, { headers });
         if (!response.ok) throw new Error('Failed to search items');
         return await response.json();
     } catch (error) {
