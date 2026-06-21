@@ -88,11 +88,15 @@ export default function CommunitiesScreen() {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const text = await res.text();
-            if (!res.ok) throw new Error('Search failed');
+            if (!res.ok) {
+                let msg = 'Search failed';
+                try { msg = JSON.parse(text).error || msg; } catch {}
+                throw new Error(msg);
+            }
             const data = JSON.parse(text);
             setSearchResults(Array.isArray(data) ? data : []);
         } catch (e: any) {
-            showAlert('Error', e.message || 'Search failed');
+            showAlert('Search Error', e.message);
         } finally {
             setSearchLoading(false);
         }

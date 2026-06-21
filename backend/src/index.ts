@@ -1725,7 +1725,7 @@ app.get('/api/communities/search', authenticateToken, async (req: any, res: any)
 
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const result = await prisma.community.findMany({
+        const communities = await prisma.community.findMany({
             where: {
                 scope: 'PUBLIC',
                 ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {})
@@ -1733,23 +1733,29 @@ app.get('/api/communities/search', authenticateToken, async (req: any, res: any)
             include: {
                 organization: true,
                 // Count only non-pending members
-                _count: { select: { members: { where: { role: { not: 'PENDING' } } } } },
-                // Only return THIS user's membership record (not all members)
-                // Using a strict userId string guard prevents the "undefined = no filter" Prisma bug
-                members: {
-                    where: { userId: userId },
-                    select: { role: true }
-                }
+                _count: { select: { members: { where: { role: { not: 'PENDING' } } } } }
             },
             take: 20
         });
 
+        // Fetch current user's membership for these communities in a separate safe query
+        const communityIds = communities.map((c: any) => c.id);
+        const myMemberships = await prisma.communityMember.findMany({
+            where: {
+                communityId: { in: communityIds },
+                userId: userId
+            }
+        });
+
         // Map result: tag each community with current user's membership status
-        const mapped = result.map((comm: any) => ({
-            ...comm,
-            myRole: comm.members?.[0]?.role ?? null, // null = not a member
-            memberCount: comm._count?.members ?? 0,
-        }));
+        const mapped = communities.map((comm: any) => {
+            const membership = myMemberships.find((m: any) => m.communityId === comm.id);
+            return {
+                ...comm,
+                myRole: membership ? membership.role : null, // null = not a member
+                memberCount: comm._count?.members ?? 0,
+            };
+        });
 
         res.json(mapped);
     } catch (e: any) {

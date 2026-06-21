@@ -1,0 +1,5 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "sqlite", url = "file:./dev.db" }
+model User { id String @id }
+model Community { id String @id, scope String, name String, members CommunityMember[] }
+model CommunityMember { id String @id, communityId String, userId String, role String, community Community @relation(fields: [communityId], references: [id]) }
