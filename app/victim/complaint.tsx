@@ -107,10 +107,11 @@ export default function FileComplaint() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    type: form.name + ' ' + form.category,
+                    name: form.name,
+                    category: form.category,
                     description: form.description,
                     location: form.location,
-                    // date intentionally excluded - validated separately by DatePicker UI
+                    date: date.toISOString().split('T')[0]
                 }),
             });
             const aiData = await aiRes.json();

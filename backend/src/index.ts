@@ -141,31 +141,30 @@ async function callGemini(prompt: string): Promise<string> {
     throw lastErr;
 }
 
-// 1. Validate victim complaint form fields
 app.post('/api/ai/validate-complaint', async (req, res) => {
-    const { type, description, location } = req.body;
+    const { name, category, description, location, date } = req.body;
     const prompt = `You are a lost item complaint validator for a mobile app.
 Validate the following fields and return JSON only.
-IMPORTANT: Do NOT validate or comment on dates at all. Dates are handled separately by the app.
+Today's Date: ${new Date().toISOString().split('T')[0]}
 
 Fields submitted:
-- Item Type/Category: "${type || ''}"
+- Item Name: "${name || ''}"
+- Category: "${category || ''}"
 - Description: "${description || ''}"
 - Location Lost: "${location || ''}"
+- Date Lost: "${date || ''}"
 
-Rules (date is excluded, do not mention it):
-1. Item type and category must logically match (e.g., iPhone must be Electronics, NOT Pets or Books).
-2. Description must be at least 5 characters and mention what the item is. Empty or very short descriptions are OK — mark valid:true but suggest they add more detail.
-3. Location must look like a real place (not random letters like "asdf" or symbols).
-4. Description must NOT contain phone numbers, emails, or social media handles.
-5. If item type is gibberish (like "asdf" or "123"), set valid:false.
-6. If location is gibberish (random letters), set valid:false.
-7. Be lenient — if the report is mostly genuine, set valid:true even if details are sparse.
+Rules:
+1. STRICT: The Category must logically match the Item Name. (e.g., iPhone must be Electronics. If Name is "Wallet" and Category is "Pets", set valid:false).
+2. STRICT: The Location must be a realistic place. If it is gibberish or non-sensical, set valid:false.
+3. STRICT: The Date Lost cannot be in the future. If it is after Today's Date, set valid:false.
+4. Description must not contain phone numbers, emails, or social media handles.
+5. If the report is otherwise genuine and makes sense, set valid:true.
 
-Respond ONLY with this JSON (no markdown, no explanation, no date comments):
+Respond ONLY with this JSON:
 {
   "valid": true or false,
-  "issues": ["list only real issues, never mention date"],
+  "issues": ["list of issues if any"],
   "suggestions": ["optional improvements"]
 }`;
     try {
@@ -173,10 +172,6 @@ Respond ONLY with this JSON (no markdown, no explanation, no date comments):
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
         const parsed = JSON.parse(text);
-        // Strip any date-related issues the AI sneaked in anyway
-        if (parsed.issues) {
-            parsed.issues = parsed.issues.filter((i: string) => !/(date|future|past|time|when)/i.test(i));
-        }
         res.json(parsed);
     } catch (err: any) {
         console.error('AI validate-complaint error:', err.message);
@@ -203,11 +198,12 @@ Fields:
 ${qList}
 
 Rules:
-1. Product name and category must logically match.
-2. Location must be a realistic place.
-3. Security questions must be highly relevant to the item.
-4. STRICTLY BLOCK any phone numbers, emails, or social media links in the description or questions.
-If it is a realistic report without contact info, set valid to true. Only set valid to false if it is complete gibberish, an obvious test string, or contains contact info.
+1. STRICT: The Category must logically match the Item Name. (e.g., If Name is "Wallet" and Category is "Pets", set valid:false).
+2. STRICT: The Location must be a realistic place. If it is gibberish or non-sensical, set valid:false.
+3. STRICT: The Date Found cannot be in the future. If it is after Today's Date, set valid:false.
+4. Security questions must be highly relevant to the item.
+5. STRICTLY BLOCK any phone numbers, emails, or social media links in the description or questions.
+If all strict rules are passed and the report is realistic without contact info, set valid to true. Otherwise, set valid to false.
 
 Respond ONLY with JSON:
 {
