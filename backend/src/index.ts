@@ -1525,6 +1525,52 @@ app.get('/api/users/me/orgs', authenticateToken, async (req: any, res: any) => {
     }
 });
 
+// Search Communities (public, for join)
+app.get('/api/communities/search', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { q } = req.query;
+        const userId: string | undefined = req.user?.id;
+
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const communities = await prisma.community.findMany({
+            where: {
+                scope: 'PUBLIC',
+                ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {})
+            },
+            include: {
+                organization: true,
+                // Count only non-pending members
+                _count: { select: { members: { where: { role: { not: 'PENDING' } } } } }
+            },
+            take: 20
+        });
+
+        // Fetch current user's membership for these communities in a separate safe query
+        const communityIds = communities.map((c: any) => c.id);
+        const myMemberships = await prisma.communityMember.findMany({
+            where: {
+                communityId: { in: communityIds },
+                userId: userId
+            }
+        });
+
+        // Map result: tag each community with current user's membership status
+        const mapped = communities.map((comm: any) => {
+            const membership = myMemberships.find((m: any) => m.communityId === comm.id);
+            return {
+                ...comm,
+                myRole: membership ? membership.role : null, // null = not a member
+                memberCount: comm._count?.members ?? 0,
+            };
+        });
+
+        res.json(mapped);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Get Community Detail with full member list
 app.get('/api/communities/:id', authenticateToken, async (req: any, res: any) => {
     try {
@@ -1717,51 +1763,6 @@ app.patch('/api/communities/:id/members/:userId', authenticateToken, async (req:
     }
 });
 
-// Search Communities (public, for join)
-app.get('/api/communities/search', authenticateToken, async (req: any, res: any) => {
-    try {
-        const { q } = req.query;
-        const userId: string | undefined = req.user?.id;
-
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-        const communities = await prisma.community.findMany({
-            where: {
-                scope: 'PUBLIC',
-                ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {})
-            },
-            include: {
-                organization: true,
-                // Count only non-pending members
-                _count: { select: { members: { where: { role: { not: 'PENDING' } } } } }
-            },
-            take: 20
-        });
-
-        // Fetch current user's membership for these communities in a separate safe query
-        const communityIds = communities.map((c: any) => c.id);
-        const myMemberships = await prisma.communityMember.findMany({
-            where: {
-                communityId: { in: communityIds },
-                userId: userId
-            }
-        });
-
-        // Map result: tag each community with current user's membership status
-        const mapped = communities.map((comm: any) => {
-            const membership = myMemberships.find((m: any) => m.communityId === comm.id);
-            return {
-                ...comm,
-                myRole: membership ? membership.role : null, // null = not a member
-                memberCount: comm._count?.members ?? 0,
-            };
-        });
-
-        res.json(mapped);
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
-});
 
 // Add Community to Organization
 app.patch('/api/orgs/:orgId/communities/:commId', authenticateToken, async (req: any, res: any) => {
