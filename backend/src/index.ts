@@ -128,13 +128,14 @@ async function callGemini(prompt: string): Promise<string> {
             return result.response.text().trim();
         } catch (err: any) {
             lastErr = err;
-            const msg = err.message || '';
-            // Only retry on model-not-found errors
-            if (msg.includes('not found') || msg.includes('404') || msg.includes('not supported')) {
-                console.warn(`Model ${GEMINI_MODELS[i]} failed, trying next...`);
+            const msg = (err.message || '').toLowerCase();
+            // Retry on model-not-found, unsupported, or quota/rate-limit errors
+            if (msg.includes('not found') || msg.includes('404') || msg.includes('not supported') || 
+                msg.includes('429') || msg.includes('quota') || msg.includes('rate limit') || msg.includes('too many requests')) {
+                console.warn(`Model ${GEMINI_MODELS[i]} failed (${msg}), trying next...`);
                 continue;
             }
-            throw err; // Other errors (auth, network) — don't retry
+            throw err; // Other errors (like 401 Auth) — don't retry
         }
     }
     throw lastErr;
