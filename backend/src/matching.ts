@@ -14,7 +14,7 @@ export const findMatchingComplaints = async (item: {
 }, prisma: any): Promise<Match[]> => {
     // Get all open complaints
     const complaints = await prisma.complaint.findMany({
-        where: { status: 'open' },
+        where: { status: 'OPEN' },
     });
 
     const matches: Match[] = [];

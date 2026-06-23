@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "1018607704367-fqajlrfhc82b4a80vn2nv6dqffko1n5p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.manikandan.findmate",
+            "certificate_hash": "883915aa0c349e7dfa805ad4e2500d74faa28869"
+          }
+        },
+        {
           "client_id": "1018607704367-i0cqp73k316t2a33spbpl2lcrh7oi7o1.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

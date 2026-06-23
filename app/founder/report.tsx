@@ -164,9 +164,16 @@ export default function ReportFoundItem() {
         try {
             let loc = null;
             if (notificationType === 'RADIUS') {
-                const { status } = await Location.requestForegroundPermissionsAsync();
-                if (status === 'granted') {
-                    loc = await Location.getCurrentPositionAsync({});
+                try {
+                    const { status } = await Location.requestForegroundPermissionsAsync();
+                    if (status === 'granted') {
+                        loc = await Location.getLastKnownPositionAsync({});
+                        if (!loc) {
+                            loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Location fetch failed or timed out:", e);
                 }
             }
 
