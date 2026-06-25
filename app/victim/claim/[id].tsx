@@ -342,7 +342,10 @@ export default function ClaimItem() {
 
             <OtpModal
                 visible={showOtpModal}
-                onClose={() => setShowOtpModal(false)}
+                onClose={() => {
+                    setShowOtpModal(false);
+                    setIsCaptchaVerified(false);
+                }}
                 onVerified={handleOtpVerified}
             />
 
