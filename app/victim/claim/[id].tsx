@@ -344,7 +344,7 @@ export default function ClaimItem() {
                 visible={showOtpModal}
                 onClose={() => {
                     setShowOtpModal(false);
-                    setIsCaptchaVerified(false);
+                    setIsClaiming(false);
                 }}
                 onVerified={handleOtpVerified}
             />
