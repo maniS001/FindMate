@@ -475,6 +475,23 @@ app.post('/api/auth/save-phone', authenticateToken, async (req: any, res: any) =
     }
 });
 
+// Update Push Token (called on every app launch when user is already logged in)
+app.post('/api/auth/update-push-token', authenticateToken, async (req: any, res: any) => {
+    try {
+        const { pushToken } = req.body;
+        const userId = req.user.id;
+        if (!pushToken) return res.status(400).json({ error: 'pushToken is required' });
+        await prisma.user.update({
+            where: { id: userId },
+            data: { pushToken },
+        });
+        res.json({ message: 'Push token updated successfully' });
+    } catch (error) {
+        console.error('Error updating push token:', error);
+        res.status(500).json({ error: 'Failed to update push token' });
+    }
+});
+
 // Google Login (Real Implementation)
 // Google Login (Real Implementation)
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;

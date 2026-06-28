@@ -8,8 +8,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import Header from '../components/Header';
 import WebContainer from '../components/WebContainer';
-import { AuthProvider } from '../contexts/AuthContext';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
+import { API_URL } from '../constants/api';
 import { registerForPushNotificationsAsync } from '../utils/pushNotifications';
 
 // Configure notification handler
@@ -30,13 +31,28 @@ function RootLayoutContent() {
   const notificationListener = useRef<Notifications.Subscription>();
   const responseListener = useRef<Notifications.Subscription>();
 
+  const { user, token: authToken } = useAuth();
+
   useEffect(() => {
-    registerForPushNotificationsAsync().then(async token => {
-      setExpoPushToken(token ?? '');
-      if (token) {
+    registerForPushNotificationsAsync().then(async pushToken => {
+      setExpoPushToken(pushToken ?? '');
+      if (pushToken) {
         // Save to AsyncStorage so login/signup can access it
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        await AsyncStorage.setItem('expoPushToken', token);
+        await AsyncStorage.setItem('expoPushToken', pushToken);
+
+        // Sync push token to backend if user is already logged in
+        if (authToken) {
+          try {
+            await fetch(`${API_URL}/auth/update-push-token`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+              body: JSON.stringify({ pushToken }),
+            });
+          } catch (e) {
+            console.warn('Failed to sync push token to backend:', e);
+          }
+        }
       }
     });
 
