@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { API_URL } from '../constants/api';
 import { registerForPushNotificationsAsync } from '../utils/pushNotifications';
+import * as Location from 'expo-location';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -41,13 +42,30 @@ function RootLayoutContent() {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
         await AsyncStorage.setItem('expoPushToken', pushToken);
 
-        // Sync push token to backend if user is already logged in
+        // Sync push token AND location to backend if user is already logged in
         if (authToken) {
           try {
+            // Get best available location (last known is instant, no GPS wait needed)
+            let latitude: number | undefined;
+            let longitude: number | undefined;
+            try {
+              const { status } = await Location.requestForegroundPermissionsAsync();
+              if (status === 'granted') {
+                const loc = await Location.getLastKnownPositionAsync({}) ||
+                            await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                if (loc) {
+                  latitude = loc.coords.latitude;
+                  longitude = loc.coords.longitude;
+                }
+              }
+            } catch (locErr) {
+              console.warn('Location fetch failed:', locErr);
+            }
+
             await fetch(`${API_URL}/auth/update-push-token`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-              body: JSON.stringify({ pushToken }),
+              body: JSON.stringify({ pushToken, latitude, longitude }),
             });
           } catch (e) {
             console.warn('Failed to sync push token to backend:', e);

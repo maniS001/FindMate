@@ -478,14 +478,17 @@ app.post('/api/auth/save-phone', authenticateToken, async (req: any, res: any) =
 // Update Push Token (called on every app launch when user is already logged in)
 app.post('/api/auth/update-push-token', authenticateToken, async (req: any, res: any) => {
     try {
-        const { pushToken } = req.body;
+        const { pushToken, latitude, longitude } = req.body;
         const userId = req.user.id;
         if (!pushToken) return res.status(400).json({ error: 'pushToken is required' });
         await prisma.user.update({
             where: { id: userId },
-            data: { pushToken },
+            data: {
+                pushToken,
+                ...(latitude !== undefined && longitude !== undefined ? { latitude, longitude } : {}),
+            },
         });
-        res.json({ message: 'Push token updated successfully' });
+        res.json({ message: 'Push token and location updated successfully' });
     } catch (error) {
         console.error('Error updating push token:', error);
         res.status(500).json({ error: 'Failed to update push token' });
@@ -855,14 +858,18 @@ app.post('/api/complaints', async (req, res) => {
                         return user.orgAdmins.some((a: any) => a.organizationId === targetOrganizationId);
                     }
 
-                    // 3. Radius target: GPS-based if both sides have coordinates
-                    if (complaintLat && complaintLon && user.latitude && user.longitude) {
-                        const distance = calculateDistance(complaintLat, complaintLon, user.latitude, user.longitude);
-                        return distance <= radius;
+                    // 3. Radius: GPS-based if complaint has coordinates
+                    if (complaintLat && complaintLon) {
+                        // If user has GPS saved → filter by distance
+                        if (user.latitude && user.longitude) {
+                            const distance = calculateDistance(complaintLat, complaintLon, user.latitude, user.longitude);
+                            return distance <= radius;
+                        }
+                        // If user has no GPS saved → skip them (they haven't opened the app recently)
+                        return false;
                     }
 
-                    // 4. Fallback: no GPS data available on either side — notify ALL users
-                    // This ensures notifications always work even without location permissions
+                    // 4. Complaint has no GPS at all → notify everyone as best effort
                     return true;
                 });
 
