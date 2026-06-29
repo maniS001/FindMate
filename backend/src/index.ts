@@ -90,12 +90,12 @@ const geminiClient = process.env.GEMINI_API_KEY
     ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
     : null;
 
-// Try models in order of preference (newest first)
+// Try models in order of preference (newest/cheapest first)
 const GEMINI_MODELS = [
-    'gemini-flash-latest',
     'gemini-1.5-flash',
-    'gemini-2.0-flash',
+    'gemini-1.5-flash-latest',
     'gemini-1.5-pro',
+    'gemini-2.0-flash',
 ];
 
 const getGeminiModel = (modelIndex = 0) => {
