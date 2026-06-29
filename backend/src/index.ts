@@ -842,25 +842,31 @@ app.post('/api/complaints', async (req, res) => {
 
                 const complaintLat = latitude || null;
                 const complaintLon = longitude || null;
-                const radius = notifyRadius || 1;
+                const radius = notifyRadius || 5;
 
-                let usersToNotify = allUsers.filter(user => {
-                    // 1. Check Community Match
-                    if (targetCommunityId && user.memberships.some((m: any) => m.communityId === targetCommunityId)) return true;
-                    // 2. Check Organization Match (Requires a join with Organization->Communities, but for now assuming if user is in org, we'd need to check. Simple approach: check if they are in ANY community of that org, or just pass for now if we don't have user.organization field directly)
-                    // Wait, we don't have direct org memberships for users, only communities and admins. Let's skip organization match for now unless they are admin. Or if we assume org = community in UI? We will just check if targetCommunityId is passed.
-                    
-                    // 3. Check Radius
+                let usersToNotify = allUsers.filter((user: any) => {
+                    // 1. Community target: only notify community members
+                    if (targetCommunityId) {
+                        return user.memberships.some((m: any) => m.communityId === targetCommunityId);
+                    }
+
+                    // 2. Organization target: only notify org admins/members
+                    if (targetOrganizationId) {
+                        return user.orgAdmins.some((a: any) => a.organizationId === targetOrganizationId);
+                    }
+
+                    // 3. Radius target: GPS-based if both sides have coordinates
                     if (complaintLat && complaintLon && user.latitude && user.longitude) {
                         const distance = calculateDistance(complaintLat, complaintLon, user.latitude, user.longitude);
-                        if (distance <= radius) return true;
-                    } else if (!complaintLat && user.location && user.location.toLowerCase().includes(location.toLowerCase())) {
-                        return true;
+                        return distance <= radius;
                     }
-                    return false;
+
+                    // 4. Fallback: no GPS data available on either side — notify ALL users
+                    // This ensures notifications always work even without location permissions
+                    return true;
                 });
 
-                console.log(`Found ${usersToNotify.length} users to notify`);
+                console.log(`Found ${usersToNotify.length} users to notify for complaint in ${location}`);
 
                 if (usersToNotify.length > 0) {
                     const notifications = usersToNotify.map(user => ({
