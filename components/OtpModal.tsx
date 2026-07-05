@@ -53,18 +53,7 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
             showMessage('OTP sent to your phone!', false);
         } catch (error: any) {
             console.error('Firebase OTP send error:', error);
-            if (error.code === 'auth/too-many-requests' || error.message?.includes('too-many-requests')) {
-                console.warn('Bypassing OTP due to too-many-requests. Use 123456 as OTP.');
-                setConfirmation({ confirm: async (code: string) => {
-                    if (code === '123456') return true;
-                    throw new Error('Invalid mock OTP');
-                }} as any);
-                setStep('otp');
-                setTimer(60);
-                showMessage('Development Bypass: Use OTP 123456', false);
-            } else {
-                showMessage(error.message || 'Failed to send OTP. Check the phone number.', true);
-            }
+            showMessage(error.message || 'Failed to send OTP. Check the phone number.', true);
         } finally {
             setLoading(false);
         }
