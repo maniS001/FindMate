@@ -46,11 +46,23 @@ export default function OtpModal({ visible, onClose, onVerified }: OtpModalProps
         }
         setLoading(true);
         try {
-            const confirmationResult = await auth().signInWithPhoneNumber(trimmedPhone);
-            setConfirmation(confirmationResult);
-            setStep('otp');
-            setTimer(60);
-            showMessage('OTP sent to your phone!', false);
+            if (Platform.OS === 'web') {
+                // Bypass native Firebase Auth on Web for showcasing
+                console.log('Web platform detected. Bypassing native OTP.');
+                setConfirmation({ confirm: async (code: string) => {
+                    if (code === '123456') return true;
+                    throw new Error('Invalid web OTP');
+                }} as any);
+                setStep('otp');
+                setTimer(60);
+                showMessage('Web Showcase Mode: Use OTP 123456', false);
+            } else {
+                const confirmationResult = await auth().signInWithPhoneNumber(trimmedPhone);
+                setConfirmation(confirmationResult);
+                setStep('otp');
+                setTimer(60);
+                showMessage('OTP sent to your phone!', false);
+            }
         } catch (error: any) {
             console.error('Firebase OTP send error:', error);
             showMessage(error.message || 'Failed to send OTP. Check the phone number.', true);
