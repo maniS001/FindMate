@@ -9,6 +9,8 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import svgCaptcha from 'svg-captcha';
 import { v4 as uuidv4 } from 'uuid';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { findMatchingComplaints } from './matching';
 
 // Load environment variables
@@ -18,6 +20,21 @@ const app = express();
 const prisma = new PrismaClient();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || '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';
+
+// Initialize Firebase Admin
+try {
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        initializeApp({
+            credential: cert(serviceAccount)
+        });
+    } else {
+        console.warn("FIREBASE_SERVICE_ACCOUNT env variable not found. Phone auth will fail. Please add it to your .env file as a JSON string.");
+        initializeApp();
+    }
+} catch (error) {
+    console.error("Firebase Admin initialization error:", error);
+}
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -398,80 +415,64 @@ app.post('/api/captcha/verify', (req, res) => {
 
 // ============= Auth Endpoints =============
 
-// Signup
-app.post('/api/auth/signup', async (req, res) => {
+// Phone Login (Primary Authentication)
+app.post('/api/auth/phone-login', async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { firebaseIdToken, name, pushToken, latitude, longitude, location } = req.body;
 
-        const existingUser = await prisma.user.findUnique({ where: { email } });
-        if (existingUser) return res.status(400).json({ error: 'Email already exists' });
+        if (!firebaseIdToken) {
+            return res.status(400).json({ error: 'Firebase ID Token is required' });
+        }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await prisma.user.create({
-            data: { name, email, password: hashedPassword },
-        });
+        // Verify the token with Firebase Admin
+        const decodedToken = await getAuth().verifyIdToken(firebaseIdToken);
+        const phone = decodedToken.phone_number;
 
-        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET);
-        res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Signup failed' });
-    }
-});
+        if (!phone) {
+            return res.status(400).json({ error: 'Phone number not found in token' });
+        }
 
-// Login
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const { email, password, pushToken } = req.body;
-        const user = await prisma.user.findUnique({ where: { email } });
+        let user = await prisma.user.findUnique({ where: { phone } });
 
-        if (!user || !user.password) return res.status(400).json({ error: 'Invalid credentials' });
-
-        const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
-
-        // Update push token if provided
-        if (pushToken) {
+        if (!user) {
+            if (!name) {
+                // If user doesn't exist, name must be provided (from Onboarding screen)
+                return res.status(400).json({ error: 'User does not exist. Name is required to register.' });
+            }
+            
+            user = await prisma.user.create({
+                data: {
+                    phone,
+                    name,
+                    location,
+                    latitude,
+                    longitude,
+                    pushToken,
+                    password: ''
+                },
+            });
+        } else {
+            // User exists, update location/push token if provided
             try {
-                await prisma.user.update({
-                    where: { id: user.id },
-                    data: { pushToken },
-                });
-            } catch (err) {
-                console.warn('Failed to update push token:', err);
+                if (location || latitude || longitude || pushToken) {
+                    await prisma.user.update({
+                        where: { id: user.id },
+                        data: { location, latitude, longitude, pushToken }
+                    });
+                }
+            } catch (ignore) {
+                console.warn('Could not update user location (schema mismatch?)');
             }
         }
 
-        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET);
-        res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+        const token = jwt.sign({ id: user.id, phone: user.phone }, JWT_SECRET);
+        res.json({ token, user: { id: user.id, name: user.name, phone: user.phone } });
     } catch (error) {
-        console.error(error);
+        console.error('Phone auth error:', error);
         res.status(500).json({
-            error: 'Login failed',
+            error: 'Phone auth failed',
             details: error instanceof Error ? error.message : String(error)
         });
-    }
-});
-
-// Save Phone Number (after Firebase OTP verification)
-app.post('/api/auth/save-phone', authenticateToken, async (req: any, res: any) => {
-    try {
-        const { phone } = req.body;
-        const userId = req.user.id;
-
-        if (!phone) {
-            return res.status(400).json({ error: 'Phone number is required' });
-        }
-
-        await prisma.user.update({
-            where: { id: userId },
-            data: { phone },
-        });
-
-        res.json({ message: 'Phone number saved successfully' });
-    } catch (error) {
-        console.error('Error saving phone number:', error);
-        res.status(500).json({ error: 'Failed to save phone number' });
     }
 });
 
@@ -492,126 +493,6 @@ app.post('/api/auth/update-push-token', authenticateToken, async (req: any, res:
     } catch (error) {
         console.error('Error updating push token:', error);
         res.status(500).json({ error: 'Failed to update push token' });
-    }
-});
-
-// Google Login (Real Implementation)
-// Google Login (Real Implementation)
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const client = new OAuth2Client(GOOGLE_CLIENT_ID);
-
-app.post('/api/auth/google', async (req, res) => {
-    try {
-        const { idToken, location, latitude, longitude, pushToken } = req.body;
-
-        if (!idToken) {
-            return res.status(400).json({ error: 'ID Token is required' });
-        }
-
-        // Verify the token
-        const ticket = await client.verifyIdToken({
-            idToken,
-            audience: GOOGLE_CLIENT_ID, // Specify the CLIENT_ID of the app that accesses the backend
-        });
-
-        const payload = ticket.getPayload();
-        if (!payload) {
-            return res.status(400).json({ error: 'Invalid token payload' });
-        }
-
-        const { email, name, sub: googleId } = payload;
-
-        if (!email) {
-            return res.status(400).json({ error: 'Email not found in token' });
-        }
-
-        let user = await prisma.user.findUnique({ where: { email } });
-
-        if (!user) {
-            try {
-                // Try to create with location
-                user = await prisma.user.create({
-                    data: {
-                        email,
-                        name: name || 'Google User',
-                        googleId,
-                        location,
-                        latitude,
-                        longitude,
-                        pushToken,
-                        password: ''
-                    },
-                });
-            } catch (createError) {
-                console.warn('Failed to save location (DB schema might be outdated). Retrying without location.');
-                // Fallback: Create without location data
-                user = await prisma.user.create({
-                    data: {
-                        email,
-                        name: name || 'Google User',
-                        googleId,
-                        password: ''
-                    },
-                });
-            }
-        } else if (!user.googleId) {
-            // Link existing account
-            try {
-                user = await prisma.user.update({
-                    where: { id: user.id },
-                    data: { googleId, location, latitude, longitude, pushToken },
-                });
-            } catch (updateError) {
-                console.warn('Failed to update location. Retrying without location data.');
-                user = await prisma.user.update({
-                    where: { id: user.id },
-                    data: { googleId },
-                });
-            }
-        } else {
-            // User exists and is linked. Update location if provided.
-            try {
-                if (location || latitude || longitude || pushToken) {
-                    await prisma.user.update({
-                        where: { id: user.id },
-                        data: { location, latitude, longitude, pushToken }
-                    });
-                }
-            } catch (ignore) {
-                // Ignore location update error (e.g. column missing)
-                console.warn('Could not update user location (schema mismatch?)');
-            }
-        }
-
-        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET);
-        res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
-    } catch (error) {
-        console.error('Google auth error:', error);
-        res.status(500).json({
-            error: 'Google auth failed',
-            details: error instanceof Error ? error.message : String(error)
-        });
-    }
-});
-
-// Save Firebase-Verified Phone Number
-// Called by the app AFTER Firebase successfully verifies the OTP on the device.
-// The backend trusts that Firebase already authenticated the phone number.
-app.post('/api/auth/save-phone', authenticateToken, async (req: any, res) => {
-    try {
-        const { phone } = req.body;
-        if (!phone) return res.status(400).json({ error: 'Phone number is required' });
-
-        const userId = req.user.id;
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
-            data: { phone },
-        });
-
-        res.json({ success: true, phone: updatedUser.phone });
-    } catch (error) {
-        console.error('Save phone error:', error);
-        res.status(500).json({ error: 'Failed to save phone number' });
     }
 });
 
@@ -1755,10 +1636,10 @@ app.post('/api/communities/:id/members', authenticateToken, async (req: any, res
         const { identifier } = req.body;
 
         const userToAdd = await prisma.user.findFirst({
-            where: { OR: [{ email: identifier }, { name: identifier }] }
+            where: { phone: identifier }
         });
 
-        if (!userToAdd) return res.status(404).json({ error: "User not found" });
+        if (!userToAdd) return res.status(404).json({ error: "User not found with this phone number" });
 
         const existing = await prisma.communityMember.findFirst({
             where: { communityId: id, userId: userToAdd.id }

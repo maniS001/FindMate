@@ -15,7 +15,6 @@ interface AuthContextType {
     isLoading: boolean;
     login: (token: string, user: User) => Promise<void>;
     logout: () => Promise<void>;
-    signup: (name: string, email: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,23 +63,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.removeItem('user');
     };
 
-    const signup = async (name: string, email: string, password: string) => {
-        try {
-            const response = await fetch(`${API_URL}/auth/signup`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, password }),
-            });
-
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Signup failed');
-
-            await login(data.token, data.user);
-        } catch (error) {
-            throw error;
-        }
-    };
-
     // Protected Route Logic
     useEffect(() => {
         if (isLoading) return;
@@ -97,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [user, segments, isLoading]);
 
     return (
-        <AuthContext.Provider value={{ user, token, isLoading, login, logout, signup }}>
+        <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

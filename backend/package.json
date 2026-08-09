@@ -31,6 +31,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "firebase-admin": "^14.2.0",
     "google-auth-library": "^10.5.0",
     "jsonwebtoken": "^9.0.2",
     "prisma": "^5.22.0",

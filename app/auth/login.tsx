@@ -1,10 +1,10 @@
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
-import { GoogleSignInBtn } from '../../components/GoogleSignInButton';
 import Input from '../../components/Input';
 import { API_URL } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,62 +17,113 @@ export default function Login() {
     const router = useRouter();
     const isKeyboardVisible = useKeyboardVisible();
 
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [step, setStep] = useState<'phone' | 'otp'>('phone');
+    const [phone, setPhone] = useState('');
+    const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [message, setMessage] = useState('');
+    const [timer, setTimer] = useState(0);
+    const [confirmation, setConfirmation] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
 
-    const handleLogin = async () => {
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval>;
+        if (timer > 0) {
+            interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
+        }
+        return () => clearInterval(interval);
+    }, [timer]);
+
+    const handleSendOtp = async () => {
         setError('');
-        if (!email || !password) {
-            setError('Please fill in all fields.');
+        setMessage('');
+        const trimmedPhone = phone.trim();
+        if (!trimmedPhone.startsWith('+') || trimmedPhone.length < 10) {
+            setError('Enter number with country code. Example: +91 9876543210');
             return;
         }
 
         setLoading(true);
         try {
-            const pushToken = await AsyncStorage.getItem('expoPushToken');
-            const response = await fetch(`${API_URL}/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, pushToken }),
-            });
-
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Login failed');
-
-            await login(data.token, data.user);
+            if (Platform.OS === 'web') {
+                console.log('Web platform detected. Bypassing native OTP.');
+                setConfirmation({ confirm: async (code: string) => {
+                    if (code === '123456') {
+                        // Mock user credential for web
+                        return { user: { getIdToken: async () => 'mock-web-token-123' } };
+                    }
+                    throw new Error('Invalid web OTP');
+                }} as any);
+                setStep('otp');
+                setTimer(60);
+                setMessage('Web Showcase Mode: Use OTP 123456');
+            } else {
+                const confirmationResult = await auth().signInWithPhoneNumber(trimmedPhone);
+                setConfirmation(confirmationResult);
+                setStep('otp');
+                setTimer(60);
+                setMessage('OTP sent successfully!');
+            }
         } catch (e: any) {
-            setError(e.message || 'Login failed. Please check your credentials.');
+            console.error('OTP Send Error:', e);
+            setError(e.message || 'Failed to send OTP.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleGoogleLogin = async (userInfo: any) => {
+    const handleVerifyOtp = async () => {
+        setError('');
+        if (otp.length !== 6) {
+            setError('Please enter the 6-digit OTP');
+            return;
+        }
+        if (!confirmation) {
+            setError('Session expired. Please resend OTP.');
+            return;
+        }
+
         setLoading(true);
         try {
-            const { idToken, location, latitude, longitude } = userInfo.data;
-            if (!idToken) throw new Error('No ID token found');
-
+            const userCredential = await confirmation.confirm(otp);
+            const firebaseIdToken = await (userCredential as any).user.getIdToken();
             const pushToken = await AsyncStorage.getItem('expoPushToken');
-            const response = await fetch(`${API_URL}/auth/google`, {
+
+            // Send to backend
+            const response = await fetch(`${API_URL}/auth/phone-login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken, location, latitude, longitude, pushToken }),
+                body: JSON.stringify({ firebaseIdToken, pushToken }),
             });
 
             const data = await response.json();
+
             if (!response.ok) {
-                throw new Error(data.details ? `${data.error}: ${data.details}` : (data.error || 'Google login failed'));
+                if (data.error && data.error.includes('Name is required to register')) {
+                    // New user! Navigate to onboarding
+                    router.replace({
+                        pathname: '/onboarding',
+                        params: { firebaseIdToken, phone: phone.trim() }
+                    });
+                    return;
+                }
+                throw new Error(data.error || 'Login failed');
             }
 
+            // Existing user, log them in
             await login(data.token, data.user);
         } catch (e: any) {
-            setError(e.message || 'Google Sign-In failed.');
+            console.error('OTP Verify Error:', e);
+            setError(e.message || 'Invalid OTP or Login Failed.');
         } finally {
             setLoading(false);
         }
+    };
+
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     return (
@@ -87,69 +138,78 @@ export default function Login() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Hide header when keyboard is open to prevent clipping */}
                     {!isKeyboardVisible && (
                         <View style={styles.header}>
                             <Text style={[styles.title, { color: colors.primary }]}>FindMate</Text>
                             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                                Welcome back!
+                                {step === 'phone' ? 'Login with your phone number' : 'Verify your phone'}
                             </Text>
                         </View>
                     )}
 
                     <View style={[styles.form, !isKeyboardVisible && { marginTop: 0 }]}>
-                        {/* Inline error banner */}
                         {!!error && (
                             <View style={[styles.errorBox, { backgroundColor: '#ff4d4f20', borderColor: '#ff4d4f' }]}>
                                 <Text style={styles.errorText}>{error}</Text>
                             </View>
                         )}
+                        {!!message && (
+                            <View style={[styles.messageBox, { backgroundColor: '#4caf5020', borderColor: '#4caf50' }]}>
+                                <Text style={styles.messageText}>{message}</Text>
+                            </View>
+                        )}
 
-                        <Input
-                            label="Email"
-                            value={email}
-                            onChangeText={(v) => { setEmail(v); setError(''); }}
-                            placeholder="Enter your email"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
-                        <Input
-                            label="Password"
-                            value={password}
-                            onChangeText={(v) => { setPassword(v); setError(''); }}
-                            placeholder="Enter your password"
-                            secureTextEntry
-                        />
-
-                        <Button
-                            title="Login"
-                            onPress={handleLogin}
-                            loading={loading}
-                            style={styles.button}
-                        />
-
-                        <View style={styles.divider}>
-                            <View style={[styles.line, { backgroundColor: colors.border }]} />
-                            <Text style={[styles.orText, { color: colors.textSecondary }]}>OR</Text>
-                            <View style={[styles.line, { backgroundColor: colors.border }]} />
-                        </View>
-
-                        <GoogleSignInBtn
-                            onSignInSuccess={handleGoogleLogin}
-                            onSignInFailure={(e) => setError(e.message || 'Google Sign-In failed')}
-                            disabled={loading}
-                        />
-
-                        <View style={styles.footer}>
-                            <Text style={[styles.footerText, { color: colors.textSecondary }]}>
-                                Don't have an account?
-                            </Text>
-                            <Link href="/auth/signup" asChild>
-                                <Text style={StyleSheet.flatten([styles.link, { color: colors.primary }])}>
-                                    Sign Up
+                        {step === 'phone' ? (
+                            <>
+                                <Input
+                                    label="Phone Number"
+                                    value={phone}
+                                    onChangeText={(v) => { setPhone(v); setError(''); }}
+                                    placeholder="+91 9876543210"
+                                    keyboardType="phone-pad"
+                                />
+                                <Button
+                                    title="Send OTP"
+                                    onPress={handleSendOtp}
+                                    loading={loading}
+                                    style={styles.button}
+                                />
+                            </>
+                        ) : (
+                            <>
+                                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                                    Enter the 6-digit code sent to {phone}
                                 </Text>
-                            </Link>
-                        </View>
+                                <Input
+                                    label="OTP"
+                                    value={otp}
+                                    onChangeText={(v) => { setOtp(v.replace(/[^0-9]/g, '')); setError(''); }}
+                                    placeholder="Enter 6-digit OTP"
+                                    keyboardType="number-pad"
+                                    maxLength={6}
+                                />
+                                <Button
+                                    title="Verify & Login"
+                                    onPress={handleVerifyOtp}
+                                    loading={loading}
+                                    style={styles.button}
+                                />
+                                <View style={styles.resendContainer}>
+                                    <Text style={{ color: colors.textSecondary }}>
+                                        Didn't receive code?{' '}
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.resendText,
+                                            { color: timer > 0 ? colors.textSecondary : colors.primary },
+                                        ]}
+                                        onPress={timer === 0 && !loading ? handleSendOtp : undefined}
+                                    >
+                                        {timer > 0 ? `Resend in ${formatTime(timer)}` : 'Resend OTP'}
+                                    </Text>
+                                </View>
+                            </>
+                        )}
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -192,20 +252,28 @@ const styles = StyleSheet.create({
         fontSize: 13,
         textAlign: 'center',
     },
-    button: { marginTop: 8 },
-    divider: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 8,
+    messageBox: {
+        borderWidth: 1,
+        borderRadius: 10,
+        padding: 12,
     },
-    line: { flex: 1, height: 1 },
-    orText: { marginHorizontal: 16, fontSize: 14 },
-    footer: {
+    messageText: {
+        color: '#4caf50',
+        fontSize: 13,
+        textAlign: 'center',
+    },
+    button: { marginTop: 8 },
+    infoText: {
+        fontSize: 14,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    resendContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        gap: 8,
         marginTop: 16,
     },
-    footerText: { fontSize: 14 },
-    link: { fontSize: 14, fontWeight: 'bold' },
+    resendText: {
+        fontWeight: 'bold',
+    },
 });

@@ -433,11 +433,11 @@ export default function CommunitiesScreen() {
                                 </TouchableOpacity>
                             </View>
                             <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
-                                Enter the registered email or username to add them directly.
+                                Enter the registered phone number to add them directly.
                             </Text>
                             <TextInput
                                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                                placeholder="Email or Username"
+                                placeholder="Phone Number (e.g. +919876543210)"
                                 placeholderTextColor={colors.textSecondary}
                                 value={memberIdentifier}
                                 onChangeText={setMemberIdentifier}

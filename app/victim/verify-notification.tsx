@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 import CaptchaWidget, { CaptchaRef } from '../../components/CaptchaWidget';
 import Input from '../../components/Input';
-import OtpModal from '../../components/OtpModal';
 import PaymentModal from '../../components/PaymentModal';
 import { CONFIG } from '../../constants/config';
 import { API_URL } from '../../constants/api';
@@ -23,19 +22,10 @@ export default function VerifyNotificationScreen() {
     const [captchaVerified, setCaptchaVerified] = useState(!CONFIG.CAPTCHA_ENABLED);
     const [captchaLoading, setCaptchaLoading] = useState(false);
     const [captchaError, setCaptchaError] = useState('');
-    const [showOtpModal, setShowOtpModal] = useState(false);
-    const [isOtpVerified, setIsOtpVerified] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [isPaid, setIsPaid] = useState(false);
 
     const captchaRef = useRef<CaptchaRef>(null);
-
-    useEffect(() => {
-        // If captcha is disabled, but OTP is enabled, show OTP modal on mount
-        if (!CONFIG.CAPTCHA_ENABLED && !isOtpVerified && CONFIG.SMS_OTP_ENABLED) {
-            setShowOtpModal(true);
-        }
-    }, []);
 
     // State for Security Questions
     const [loading, setLoading] = useState(false);
@@ -67,29 +57,17 @@ export default function VerifyNotificationScreen() {
         const isCorrect = captchaRef.current.validate();
         if (isCorrect) {
             setCaptchaVerified(true);
-            // Proceed to OTP or questions
-            if (CONFIG.SMS_OTP_ENABLED) {
-                setTimeout(() => setShowOtpModal(true), 300);
+            // Proceed to payment or questions
+            if (CONFIG.ENABLE_PAYMENT) {
+                setShowPaymentModal(true);
             } else {
-                handleOtpVerified();
+                setIsPaid(true);
             }
         } else {
             setCaptchaError('Incorrect answer. Please try again.');
             captchaRef.current?.refresh();
         }
         setCaptchaLoading(false);
-    };
-
-    // --- Step 2: OTP ---
-    const handleOtpVerified = () => {
-        setIsOtpVerified(true);
-        setShowOtpModal(false);
-        // Step 3: Trigger Payment if enabled, else go to Questions
-        if (CONFIG.ENABLE_PAYMENT) {
-            setShowPaymentModal(true);
-        } else {
-            setIsPaid(true);
-        }
     };
 
     // --- Step 3: Payment ---
@@ -254,12 +232,6 @@ export default function VerifyNotificationScreen() {
                 visible={showPaymentModal}
                 onClose={() => setShowPaymentModal(false)}
                 onSuccess={handlePaymentSuccess}
-            />
-
-            <OtpModal
-                visible={showOtpModal}
-                onClose={() => setShowOtpModal(false)}
-                onVerified={handleOtpVerified}
             />
 
             <KeyboardAvoidingView
