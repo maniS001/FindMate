@@ -162,6 +162,7 @@ export default function Login() {
 
             // Existing user, log them in
             await login(data.token, data.user);
+            router.replace('/');
         } catch (e: any) {
             console.error('OTP Verify Error:', e);
             setError(e.message || 'Invalid OTP or Login Failed.');
