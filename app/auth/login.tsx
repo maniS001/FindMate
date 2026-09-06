@@ -72,11 +72,13 @@ export default function Login() {
             if (Platform.OS === 'web') {
                 console.log('Web platform detected. Using Firebase Web SDK.');
                 
-                if (!(window as any).recaptchaVerifier) {
-                    (window as any).recaptchaVerifier = new RecaptchaVerifier(authWeb, 'recaptcha-container', {
-                        size: 'invisible'
-                    });
+                // Always recreate to avoid stale DOM node references in React
+                if ((window as any).recaptchaVerifier) {
+                    try { (window as any).recaptchaVerifier.clear(); } catch (e) {}
                 }
+                (window as any).recaptchaVerifier = new RecaptchaVerifier(authWeb, 'recaptcha-container', {
+                    size: 'invisible'
+                });
                 const appVerifier = (window as any).recaptchaVerifier;
                 
                 const confirmationResult = await signInWithPhoneNumberWeb(authWeb, formattedPhone, appVerifier);
