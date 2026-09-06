@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (isLoading) return;
 
-        const inAuthGroup = segments[0] === 'auth';
+        const inAuthGroup = segments[0] === 'auth' || segments[0] === 'onboarding';
 
         if (!user && !inAuthGroup) {
             // Redirect to login if not authenticated and not in auth group

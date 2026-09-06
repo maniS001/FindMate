@@ -148,9 +148,8 @@ export default function Login() {
                 throw new Error(errorMessage);
             }
 
-            // Existing user, log them in
+            // Existing user, log them in (AuthContext will auto-redirect to home)
             await login(data.token, data.user);
-            router.replace('/');
         } catch (e: any) {
             console.error('OTP Verify Error:', e);
             setError(e.message || 'Invalid OTP or Login Failed.');
