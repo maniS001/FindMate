@@ -19,8 +19,17 @@ export default function Login() {
     const router = useRouter();
     const isKeyboardVisible = useKeyboardVisible();
 
+    const COUNTRIES = [
+        { code: '+91', country: 'India', flag: '🇮🇳' },
+        { code: '+1', country: 'USA/Canada', flag: '🇺🇸' },
+        { code: '+44', country: 'UK', flag: '🇬🇧' },
+        { code: '+61', country: 'Australia', flag: '🇦🇺' },
+        { code: '+971', country: 'UAE', flag: '🇦🇪' },
+        { code: '+65', country: 'Singapore', flag: '🇸🇬' },
+    ];
+
     const [step, setStep] = useState<'phone' | 'otp'>('phone');
-    const [countryCode, setCountryCode] = useState('+91');
+    const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
     const [showCountryPicker, setShowCountryPicker] = useState(false);
     const [phone, setPhone] = useState('');
     const [isPhoneFocused, setIsPhoneFocused] = useState(false);
@@ -51,7 +60,7 @@ export default function Login() {
         setError('');
         setMessage('');
         // Format to strict Firebase E.164 format by stripping all spaces
-        const formattedPhone = (countryCode + phone).replace(/\s+/g, '');
+        const formattedPhone = (selectedCountry.code + phone).replace(/\s+/g, '');
         
         if (phone.trim().length < 5) {
             setError('Please enter a valid phone number');
@@ -206,8 +215,10 @@ export default function Login() {
                                             style={styles.countryPickerButton}
                                             onPress={() => setShowCountryPicker(true)}
                                         >
-                                            <Text style={[styles.countryCodeText, { color: colors.text }]}>{countryCode}</Text>
-                                            <ChevronDown size={16} color={colors.textSecondary} style={{ marginLeft: 4 }} />
+                                            <Text style={[styles.countryCodeText, { color: colors.text }]}>
+                                                {selectedCountry.flag} {selectedCountry.country} ({selectedCountry.code})
+                                            </Text>
+                                            <ChevronDown size={16} color={colors.textSecondary} style={{ marginLeft: 6 }} />
                                         </TouchableOpacity>
                                         
                                         <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -270,38 +281,32 @@ export default function Login() {
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            <Modal visible={showCountryPicker} animationType="slide" transparent={true}>
+            <Modal visible={showCountryPicker} animationType="fade" transparent={true}>
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+                    <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
                         <Text style={[styles.modalTitle, { color: colors.text }]}>Select Country Code</Text>
                         <FlatList
-                            data={[
-                                { code: '+91', country: 'India' },
-                                { code: '+1', country: 'USA/Canada' },
-                                { code: '+44', country: 'UK' },
-                                { code: '+61', country: 'Australia' },
-                                { code: '+971', country: 'UAE' },
-                                { code: '+65', country: 'Singapore' },
-                            ]}
+                            data={COUNTRIES}
                             keyExtractor={(item) => item.code}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
                                     style={[styles.countryItem, { borderBottomColor: colors.border }]}
                                     onPress={() => {
-                                        setCountryCode(item.code);
+                                        setSelectedCountry(item);
                                         setShowCountryPicker(false);
                                     }}
                                 >
-                                    <Text style={[styles.countryItemCode, { color: colors.primary }]}>{item.code}</Text>
-                                    <Text style={[styles.countryItemName, { color: colors.text }]}>{item.country}</Text>
+                                    <Text style={[styles.countryItemText, { color: colors.text }]}>
+                                        {item.flag} {item.country} ({item.code})
+                                    </Text>
                                 </TouchableOpacity>
                             )}
                         />
                         <TouchableOpacity 
-                            style={[styles.closeModalButton, { backgroundColor: colors.surface }]}
+                            style={[styles.closeModalButton, { backgroundColor: colors.border }]}
                             onPress={() => setShowCountryPicker(false)}
                         >
-                            <Text style={{ color: colors.text }}>Cancel</Text>
+                            <Text style={{ color: colors.text, fontWeight: 'bold' }}>Cancel</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -334,6 +339,42 @@ const styles = StyleSheet.create({
         width: '100%',
         maxWidth: 480,
         alignSelf: 'center',
+    },
+    phoneInputContainer: {
+        gap: 8,
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        marginLeft: 4,
+    },
+    phoneRow: {
+        flexDirection: 'row',
+        borderWidth: 1,
+        borderRadius: 12,
+        height: 56,
+        alignItems: 'center',
+        overflow: 'hidden',
+    },
+    countryPickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        height: '100%',
+    },
+    countryCodeText: {
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    divider: {
+        width: 1,
+        height: 24,
+    },
+    phoneInput: {
+        flex: 1,
+        height: '100%',
+        paddingHorizontal: 16,
+        fontSize: 16,
     },
     errorBox: {
         borderWidth: 1,
@@ -368,5 +409,42 @@ const styles = StyleSheet.create({
     },
     resendText: {
         fontWeight: 'bold',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        width: '85%',
+        maxWidth: 400,
+        borderRadius: 16,
+        padding: 24,
+        maxHeight: '80%',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    countryItem: {
+        paddingVertical: 16,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    countryItemText: {
+        fontSize: 16,
+    },
+    closeModalButton: {
+        marginTop: 16,
+        padding: 14,
+        borderRadius: 10,
+        alignItems: 'center',
     },
 });
