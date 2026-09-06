@@ -113,7 +113,7 @@ function RootLayoutContent() {
             >
               <Stack.Screen name="index" />
               <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-              <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
+              <Stack.Screen name="onboarding" options={{ headerShown: false }} />
               <Stack.Screen name="victim/search" />
               <Stack.Screen name="victim/results" />
               <Stack.Screen name="victim/claim/[id]" />

@@ -2,8 +2,9 @@ import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, Modal, TouchableOpacity, FlatList, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChevronDown } from 'lucide-react-native';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import { API_URL } from '../../constants/api';
@@ -18,7 +19,10 @@ export default function Login() {
     const isKeyboardVisible = useKeyboardVisible();
 
     const [step, setStep] = useState<'phone' | 'otp'>('phone');
+    const [countryCode, setCountryCode] = useState('+91');
+    const [showCountryPicker, setShowCountryPicker] = useState(false);
     const [phone, setPhone] = useState('');
+    const [isPhoneFocused, setIsPhoneFocused] = useState(false);
     const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -34,12 +38,22 @@ export default function Login() {
         return () => clearInterval(interval);
     }, [timer]);
 
+    // Force disable app verification in development to allow Test Phone Numbers to work perfectly
+    useEffect(() => {
+        if (__DEV__ && Platform.OS !== 'web') {
+            auth().settings.appVerificationDisabledForTesting = true;
+            console.log('Development mode: appVerificationDisabledForTesting is TRUE');
+        }
+    }, []);
+
     const handleSendOtp = async () => {
         setError('');
         setMessage('');
-        const trimmedPhone = phone.trim();
-        if (!trimmedPhone.startsWith('+') || trimmedPhone.length < 10) {
-            setError('Enter number with country code. Example: +91 9876543210');
+        // Format to strict Firebase E.164 format by stripping all spaces
+        const formattedPhone = (countryCode + phone).replace(/\s+/g, '');
+        
+        if (phone.trim().length < 5) {
+            setError('Please enter a valid phone number');
             return;
         }
 
@@ -58,7 +72,7 @@ export default function Login() {
                 setTimer(60);
                 setMessage('Web Showcase Mode: Use OTP 123456');
             } else {
-                const confirmationResult = await auth().signInWithPhoneNumber(trimmedPhone);
+                const confirmationResult = await auth().signInWithPhoneNumber(formattedPhone);
                 setConfirmation(confirmationResult);
                 setStep('otp');
                 setTimer(60);
@@ -66,7 +80,15 @@ export default function Login() {
             }
         } catch (e: any) {
             console.error('OTP Send Error:', e);
-            setError(e.message || 'Failed to send OTP.');
+            
+            // Deeply analyzed Firebase Error Handling
+            if (e.code === 'auth/missing-client-identifier' || e.message.includes('missing-client-identifier')) {
+                setError('Google Play Integrity Blocked this request (Common in Dev Builds).\n\nFIX 1: Use a Test Phone Number (added in Firebase Auth -> Phone, with NO SPACES).\n\nFIX 2: Use the Production APK (which is currently building).');
+            } else if (e.code === 'auth/too-many-requests') {
+                setError('Too many requests. Firebase has temporarily blocked this device. Please use a Test Phone Number.');
+            } else {
+                setError(e.message || 'Failed to send OTP.');
+            }
         } finally {
             setLoading(false);
         }
@@ -161,13 +183,37 @@ export default function Login() {
 
                         {step === 'phone' ? (
                             <>
-                                <Input
-                                    label="Phone Number"
-                                    value={phone}
-                                    onChangeText={(v) => { setPhone(v); setError(''); }}
-                                    placeholder="+91 9876543210"
-                                    keyboardType="phone-pad"
-                                />
+                                <View style={styles.phoneInputContainer}>
+                                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Phone Number</Text>
+                                    <View style={[
+                                        styles.phoneRow,
+                                        { 
+                                            backgroundColor: colors.surface,
+                                            borderColor: error ? colors.error : (isPhoneFocused ? colors.primary : colors.border)
+                                        }
+                                    ]}>
+                                        <TouchableOpacity 
+                                            style={styles.countryPickerButton}
+                                            onPress={() => setShowCountryPicker(true)}
+                                        >
+                                            <Text style={[styles.countryCodeText, { color: colors.text }]}>{countryCode}</Text>
+                                            <ChevronDown size={16} color={colors.textSecondary} style={{ marginLeft: 4 }} />
+                                        </TouchableOpacity>
+                                        
+                                        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                                        
+                                        <TextInput
+                                            style={[styles.phoneInput, { color: colors.text }]}
+                                            value={phone}
+                                            onChangeText={(v) => { setPhone(v); setError(''); }}
+                                            placeholder="98765 43210"
+                                            placeholderTextColor={colors.textSecondary}
+                                            keyboardType="phone-pad"
+                                            onFocus={() => setIsPhoneFocused(true)}
+                                            onBlur={() => setIsPhoneFocused(false)}
+                                        />
+                                    </View>
+                                </View>
                                 <Button
                                     title="Send OTP"
                                     onPress={handleSendOtp}
@@ -213,6 +259,43 @@ export default function Login() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            <Modal visible={showCountryPicker} animationType="slide" transparent={true}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>Select Country Code</Text>
+                        <FlatList
+                            data={[
+                                { code: '+91', country: 'India' },
+                                { code: '+1', country: 'USA/Canada' },
+                                { code: '+44', country: 'UK' },
+                                { code: '+61', country: 'Australia' },
+                                { code: '+971', country: 'UAE' },
+                                { code: '+65', country: 'Singapore' },
+                            ]}
+                            keyExtractor={(item) => item.code}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={[styles.countryItem, { borderBottomColor: colors.border }]}
+                                    onPress={() => {
+                                        setCountryCode(item.code);
+                                        setShowCountryPicker(false);
+                                    }}
+                                >
+                                    <Text style={[styles.countryItemCode, { color: colors.primary }]}>{item.code}</Text>
+                                    <Text style={[styles.countryItemName, { color: colors.text }]}>{item.country}</Text>
+                                </TouchableOpacity>
+                            )}
+                        />
+                        <TouchableOpacity 
+                            style={[styles.closeModalButton, { backgroundColor: colors.surface }]}
+                            onPress={() => setShowCountryPicker(false)}
+                        >
+                            <Text style={{ color: colors.text }}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }

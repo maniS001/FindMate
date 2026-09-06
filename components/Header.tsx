@@ -59,7 +59,7 @@ export default function Header({ forceShow = false }: { forceShow?: boolean } = 
         }
     };
 
-    const hideHeaderRoutes = ['/auth/signup', '/account', '/settings', '/about', '/notifications', '/success', '/founder/complaints'];
+    const hideHeaderRoutes = ['/auth/login', '/account', '/settings', '/about', '/notifications', '/success', '/founder/complaints'];
     if (!forceShow && hideHeaderRoutes.includes(pathname)) return null;
 
     return (
