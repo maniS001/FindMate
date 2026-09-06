@@ -56,6 +56,24 @@ export default function Login() {
         }
     }, []);
 
+    // Initialize Web Recaptcha on mount
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            // Clear any lingering recaptcha instances
+            if ((window as any).recaptchaVerifier) {
+                try { (window as any).recaptchaVerifier.clear(); } catch(e) {}
+                (window as any).recaptchaVerifier = null;
+            }
+            try {
+                (window as any).recaptchaVerifier = new RecaptchaVerifier(authWeb, 'recaptcha-container', {
+                    size: 'invisible',
+                });
+            } catch (e) {
+                console.error("Recaptcha Init Error", e);
+            }
+        }
+    }, []);
+
     const handleSendOtp = async () => {
         setError('');
         setMessage('');
@@ -72,16 +90,8 @@ export default function Login() {
             if (Platform.OS === 'web') {
                 console.log('Web platform detected. Using Firebase Web SDK.');
                 
-                // Initialize Recaptcha if it doesn't exist
-                if (!(window as any).recaptchaVerifier) {
-                    (window as any).recaptchaVerifier = new RecaptchaVerifier(authWeb, 'recaptcha-container', {
-                        size: 'invisible',
-                        callback: () => {
-                            // reCAPTCHA solved, allow signInWithPhoneNumber
-                        }
-                    });
-                }
                 const appVerifier = (window as any).recaptchaVerifier;
+                if (!appVerifier) throw new Error("Recaptcha not initialized. Please refresh the page.");
                 
                 const confirmationResult = await signInWithPhoneNumberWeb(authWeb, formattedPhone, appVerifier);
                 setConfirmation(confirmationResult as any);
