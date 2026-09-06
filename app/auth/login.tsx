@@ -11,7 +11,8 @@ import { API_URL } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
-
+import { authWeb } from '../../utils/firebaseWeb';
+import { RecaptchaVerifier, signInWithPhoneNumber as signInWithPhoneNumberWeb } from 'firebase/auth';
 export default function Login() {
     const { colors } = useTheme();
     const { login } = useAuth();
@@ -60,17 +61,24 @@ export default function Login() {
         setLoading(true);
         try {
             if (Platform.OS === 'web') {
-                console.log('Web platform detected. Bypassing native OTP.');
-                setConfirmation({ confirm: async (code: string) => {
-                    if (code === '123456') {
-                        // Mock user credential for web
-                        return { user: { getIdToken: async () => 'mock-web-token-123' } };
-                    }
-                    throw new Error('Invalid web OTP');
-                }} as any);
+                console.log('Web platform detected. Using Firebase Web SDK.');
+                
+                // Initialize Recaptcha if it doesn't exist
+                if (!(window as any).recaptchaVerifier) {
+                    (window as any).recaptchaVerifier = new RecaptchaVerifier(authWeb, 'recaptcha-container', {
+                        size: 'invisible',
+                        callback: () => {
+                            // reCAPTCHA solved, allow signInWithPhoneNumber
+                        }
+                    });
+                }
+                const appVerifier = (window as any).recaptchaVerifier;
+                
+                const confirmationResult = await signInWithPhoneNumberWeb(authWeb, formattedPhone, appVerifier);
+                setConfirmation(confirmationResult as any);
                 setStep('otp');
                 setTimer(60);
-                setMessage('Web Showcase Mode: Use OTP 123456');
+                setMessage('OTP sent successfully to your phone!');
             } else {
                 const confirmationResult = await auth().signInWithPhoneNumber(formattedPhone);
                 setConfirmation(confirmationResult);
@@ -181,6 +189,7 @@ export default function Login() {
                                 <Text style={styles.messageText}>{message}</Text>
                             </View>
                         )}
+                        {Platform.OS === 'web' && <View nativeID="recaptcha-container" />}
 
                         {step === 'phone' ? (
                             <>

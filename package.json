@@ -45,6 +45,7 @@
     "expo-system-ui": "~6.0.9",
     "expo-web-browser": "~15.0.10",
     "express": "^5.1.0",
+    "firebase": "^12.18.0",
     "lucide-react-native": "^0.554.0",
     "netlify": "^23.12.3",
     "react": "19.1.0",
