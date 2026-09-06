@@ -7,7 +7,6 @@ const firebaseConfig = {
   projectId: "stproject-1dbc9",
   storageBucket: "stproject-1dbc9.firebasestorage.app",
   messagingSenderId: "1018607704367",
-  appId: "1:1018607704367:android:458fd1820d5683b8b7a9da",
 };
 
 // Initialize Firebase only once
